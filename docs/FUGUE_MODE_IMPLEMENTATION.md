@@ -2,11 +2,11 @@
 
 ## Overview
 
-The Mystery Melody Machine now supports a **fugue pattern** mode that generates mini-fugues according to classical contrapuntal principles. This mode creates complex polyphonic textures with subject and answer entries, episodes, and optional stretto sections.
+SoundForgeEngine now supports a **fugue pattern** mode that generates mini-fugues according to classical contrapuntal principles. This mode creates complex polyphonic textures with subject and answer entries, episodes, and optional stretto sections.
 
 ## What is a Fugue?
 
-A fugue is a compositional technique where a main theme (called the "subject") is introduced by one voice and then systematically imitated by other voices at different pitch levels. The fugue mode in the Mystery Melody Machine implements:
+A fugue is a compositional technique where a main theme (called the "subject") is introduced by one voice and then systematically imitated by other voices at different pitch levels. The fugue mode in SoundForgeEngine implements:
 
 - **Subject**: A melodically interesting theme generated based on the current scale and key
 - **Answer**: The subject transposed to the dominant (perfect 5th), with optional tonal adjustments

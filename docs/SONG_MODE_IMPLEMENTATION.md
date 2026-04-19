@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Mystery Melody Machine now supports a **song mode** that generates complete structured compositions using common song patterns found in popular music. This mode creates multi-section compositions with varying dynamics, density, and musical character that follow traditional songwriting forms.
+SoundForgeEngine now supports a **song mode** that generates complete structured compositions using common song patterns found in popular music. This mode creates multi-section compositions with varying dynamics, density, and musical character that follow traditional songwriting forms.
 
 ## What is Song Mode?
 

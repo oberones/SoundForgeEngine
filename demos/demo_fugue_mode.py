@@ -1,4 +1,4 @@
-"""Demonstration of fugue mode in the Mystery Melody Machine.
+"""Demonstration of fugue mode in SoundForgeEngine.
 
 This script shows how to use the new fugue pattern style that generates
 mini-fugues according to classical contrapuntal principles.
@@ -15,7 +15,7 @@ from scale_mapper import ScaleMapper
 
 def demo_fugue_mode():
     """Demonstrate fugue mode functionality."""
-    print("=== Mystery Melody Machine - Fugue Mode Demo ===\n")
+    print("=== SoundForgeEngine - Fugue Mode Demo ===\n")
     
     # Initialize the sequencer
     state = State()

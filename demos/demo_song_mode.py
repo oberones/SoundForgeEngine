@@ -1,4 +1,4 @@
-"""Demonstration of song mode in the Mystery Melody Machine.
+"""Demonstration of song mode in SoundForgeEngine.
 
 This script shows how to use the new song pattern style that generates
 structured compositions using common song forms like verse-chorus patterns.
@@ -15,7 +15,7 @@ from scale_mapper import ScaleMapper
 
 def demo_song_mode():
     """Demonstrate song mode functionality."""
-    print("=== Mystery Melody Machine - Song Mode Demo ===\n")
+    print("=== SoundForgeEngine - Song Mode Demo ===\n")
     
     # Initialize the sequencer
     state = State()
