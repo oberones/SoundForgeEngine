@@ -42,16 +42,15 @@ class UIPersistenceManager:
 
     def differs_from_persisted(self, path: str) -> bool:
         current = self._config_provider().model_dump()
-        if not self._persisted_data:
-            return False
         return _lookup_path(current, path) != _lookup_path(self._persisted_data, path)
 
     def persist(self, revision: str, current_revision: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         if not self._config_path:
             raise ValueError("Persistence is not supported for this runtime configuration")
-        if revision != current_revision:
-            raise ValueError("Persist requests must target the latest known revision")
 
+        # Persist the server's current config model rather than coupling saves to the
+        # latest global UI snapshot revision. Runtime-only state changes can advance the
+        # snapshot token without changing the config that should be written to disk.
         data = self._config_provider().model_dump()
         self._config_path.parent.mkdir(parents=True, exist_ok=True)
 
