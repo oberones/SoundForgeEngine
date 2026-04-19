@@ -56,6 +56,29 @@ npm run build
 cd ..
 ```
 
+### Local UI Development
+
+For the fastest local testing loop, run the engine and the Vite dev server side by side.
+
+Terminal 1:
+
+```bash
+source .venv/bin/activate
+python src/main.py --config config.yaml --log-level INFO
+```
+
+Terminal 2:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open [http://127.0.0.1:5173/ui/](http://127.0.0.1:5173/ui/).
+
+The Vite dev server proxies dashboard API requests to the engine on `127.0.0.1:8080`, so this is the best setup for day-to-day UI work. For a more production-like smoke test, build the frontend and use the engine-served dashboard at `/ui`.
+
 ### Run the Engine
 
 ```bash
@@ -325,6 +348,8 @@ npm run build
 ```
 
 The frontend workspace also includes Playwright specs under `frontend/tests/e2e/`.
+
+For interactive UI testing during development, use `npm run dev` with the engine running locally and open `http://127.0.0.1:5173/ui/`.
 
 ## Project Layout
 
