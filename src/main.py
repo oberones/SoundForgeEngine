@@ -297,7 +297,7 @@ def main(argv: Optional[list[str]] = None):
     router = Router(cfg, handle_semantic)
     
     # Initialize API server if enabled
-    api_server = create_api_server(cfg, handle_semantic)
+    api_server = create_api_server(cfg, handle_semantic, config_path=args.config)
     if api_server:
         api_server.start()
         log.info(f"API server started on port {cfg.api.port}")

@@ -4,7 +4,7 @@ python-osc
 prometheus-client
 pyyaml
 pydantic
-pygame
+# Optional: install `pygame` separately if you want the alternate HID joystick backend.
 hidapi
 fastapi
 uvicorn

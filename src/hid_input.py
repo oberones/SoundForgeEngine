@@ -13,6 +13,7 @@ try:
     import pygame
     pygame_available = True
 except ImportError:
+    pygame = None
     pygame_available = False
 
 # Try importing hidapi as fallback
@@ -20,6 +21,7 @@ try:
     from hidapi_input import HidapiInput
     hidapi_available = True
 except ImportError:
+    HidapiInput = None
     hidapi_available = False
 
 from events import SemanticEvent

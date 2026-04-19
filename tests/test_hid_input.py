@@ -3,6 +3,7 @@
 import pytest
 import time
 from unittest.mock import Mock, patch, MagicMock
+import hid_input
 from events import SemanticEvent
 from hid_input import HidInput
 from hybrid_input import HybridInput, HybridInputConfig
@@ -116,6 +117,10 @@ class TestHidInput:
         assert hid_input._backend_type is None
 
 
+@pytest.mark.skipif(
+    not hid_input.pygame_available,
+    reason="pygame is optional and not installed",
+)
 class TestPygameHidInput:
     """Test pygame-specific HID input functionality."""
     
