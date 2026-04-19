@@ -1,0 +1,492 @@
+openapi: 3.1.0
+info:
+  title: SoundForgeEngine Control Surface API
+  version: 0.1.0
+  description: >
+    Planned dashboard-facing contract for the Control UI Dashboard feature.
+    This extends the existing FastAPI control surface with metadata, session,
+    snapshot, and persistence endpoints while preserving runtime config and
+    semantic action parity.
+servers:
+  - url: http://localhost:8080
+paths:
+  /ui:
+    get:
+      summary: Serve the dashboard application shell
+      description: >
+        Returns the HTML shell for the dashboard when the FastAPI service is
+        serving the bundled frontend assets in production.
+      responses:
+        "200":
+          description: Dashboard application shell
+          content:
+            text/html:
+              schema:
+                type: string
+        "503":
+          description: Dashboard assets unavailable
+  /ui/assets/{assetName}:
+    get:
+      summary: Serve dashboard static assets
+      description: >
+        Returns bundled JavaScript, CSS, font, image, or manifest assets
+        referenced by the dashboard application shell.
+      parameters:
+        - in: path
+          name: assetName
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Static asset response
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Asset not found
+  /ui/bootstrap:
+    get:
+      summary: Load the dashboard bootstrap payload
+      description: >
+        Returns control domains, control definitions, action definitions,
+        session policy, persistence capabilities, and the latest runtime
+        snapshot in one response.
+      responses:
+        "200":
+          description: Bootstrap payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BootstrapResponse"
+  /ui/sessions:
+    post:
+      summary: Register a dashboard session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+  /ui/sessions/{sessionId}/heartbeat:
+    post:
+      summary: Refresh dashboard session liveness
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Heartbeat accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "404":
+          description: Unknown or expired session
+  /ui/sessions/{sessionId}:
+    delete:
+      summary: Close a dashboard session
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Session released
+  /ui/snapshot:
+    get:
+      summary: Fetch the latest runtime snapshot or delta
+      parameters:
+        - in: query
+          name: since_revision
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Snapshot payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SnapshotResponse"
+  /config:
+    post:
+      summary: Apply a runtime configuration update
+      description: >
+        Existing endpoint extended with revision-aware conflict metadata so the
+        UI can protect dirty fields from accidental overwrite.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigUpdateRequest"
+      responses:
+        "200":
+          description: Update applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigUpdateResponse"
+        "409":
+          description: Revision conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictResponse"
+  /config/persist:
+    post:
+      summary: Persist supported settings to the active config file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersistRequest"
+      responses:
+        "200":
+          description: Persist operation completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersistResponse"
+        "400":
+          description: Persist request invalid
+  /actions/catalog:
+    get:
+      summary: Enumerate supported semantic actions for the dashboard
+      responses:
+        "200":
+          description: Action catalog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionCatalogResponse"
+  /actions/semantic:
+    post:
+      summary: Trigger a semantic action through the shared control contract
+      description: >
+        Mirrors the existing semantic-action endpoint so the dashboard invokes
+        command-style interactions through the same API surface used by other
+        control clients.
+      parameters:
+        - in: query
+          name: action
+          required: true
+          description: Stable semantic action identifier to invoke.
+          schema:
+            type: string
+        - in: query
+          name: value
+          required: false
+          description: >
+            Optional action value. Non-string inputs are serialized by the
+            caller according to the action metadata.
+          schema:
+            type: string
+        - in: query
+          name: source
+          required: false
+          description: Source identifier for observability and downstream handling.
+          schema:
+            type: string
+            default: ui
+      responses:
+        "200":
+          description: Semantic action triggered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionInvocationResponse"
+        "400":
+          description: Invalid action request
+        "503":
+          description: Semantic action handler unavailable
+components:
+  schemas:
+    BootstrapResponse:
+      type: object
+      required:
+        - snapshot
+        - domains
+        - actions
+        - session_policy
+      properties:
+        snapshot:
+          $ref: "#/components/schemas/EngineSnapshot"
+        domains:
+          type: array
+          items:
+            $ref: "#/components/schemas/ControlDomain"
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActionDefinition"
+        session_policy:
+          type: object
+          properties:
+            authentication:
+              type: string
+              enum: [none]
+            concurrency_mode:
+              type: string
+              enum: [single-active-operator]
+            heartbeat_timeout_seconds:
+              type: integer
+        persistence:
+          type: object
+          properties:
+            mode:
+              type: string
+              enum: [apply-live-then-explicit-save]
+            supported:
+              type: boolean
+    ControlDomain:
+      type: object
+      required: [id, title, sort_order, controls]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        sort_order:
+          type: integer
+        controls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ControlDefinition"
+    ControlDefinition:
+      type: object
+      required:
+        - id
+        - path
+        - control_kind
+        - label
+        - value_type
+        - availability
+        - persist_behavior
+        - revision
+      properties:
+        id:
+          type: string
+        path:
+          type: string
+        control_kind:
+          type: string
+          enum: [scalar, toggle, enum, mapping, collection, action, readonly]
+        label:
+          type: string
+        description:
+          type: string
+        value_type:
+          type: string
+        current_value: {}
+        default_value: {}
+        constraints:
+          type: object
+          additionalProperties: true
+        ui_hint:
+          type: string
+        availability:
+          type: string
+          enum: [available, unavailable, unsupported-context]
+        persist_behavior:
+          type: string
+          enum: [session-only, persistable, readonly]
+        revision:
+          type: string
+        dirty_state:
+          type: string
+          enum: [clean, dirty, conflicted]
+    ActionDefinition:
+      type: object
+      required: [id, label, availability]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        confirmation_required:
+          type: boolean
+        availability:
+          type: string
+          enum: [available, unavailable, unsupported-context]
+        parameter_schema:
+          type: object
+          additionalProperties: true
+        result_message_template:
+          type: string
+    ActionCatalogResponse:
+      type: object
+      required: [actions]
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActionDefinition"
+    ActionInvocationResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    EngineSnapshot:
+      type: object
+      required: [revision, captured_at, status]
+      properties:
+        revision:
+          type: string
+        captured_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [running, degraded, unreachable]
+        uptime_seconds:
+          type: number
+        config_values:
+          type: object
+          additionalProperties: true
+        state_values:
+          type: object
+          additionalProperties: true
+        changed_paths:
+          type: array
+          items:
+            type: string
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationMessage"
+        active_session_id:
+          type: string
+          nullable: true
+    CreateSessionRequest:
+      type: object
+      properties:
+        client_name:
+          type: string
+        user_agent:
+          type: string
+    SessionResponse:
+      type: object
+      required: [session_id, status, conflict_state]
+      properties:
+        session_id:
+          type: string
+        status:
+          type: string
+          enum: [active, expired, warning-only]
+        conflict_state:
+          type: string
+          enum: [none, unsupported-concurrent-use]
+        active_session_id:
+          type: string
+          nullable: true
+    ConfigUpdateRequest:
+      type: object
+      required: [path, value]
+      properties:
+        path:
+          type: string
+        value: {}
+        apply_immediately:
+          type: boolean
+          default: true
+        expected_revision:
+          type: string
+          nullable: true
+        session_id:
+          type: string
+          nullable: true
+    ConfigUpdateResponse:
+      type: object
+      required: [success, message, revision]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        old_value: {}
+        new_value: {}
+        applied_to_state:
+          type: boolean
+        revision:
+          type: string
+        persisted:
+          type: boolean
+    ConflictResponse:
+      type: object
+      required: [detail, current_revision]
+      properties:
+        detail:
+          type: string
+        current_revision:
+          type: string
+        current_value: {}
+        affected_path:
+          type: string
+    PersistRequest:
+      type: object
+      required: [revision]
+      properties:
+        revision:
+          type: string
+        session_id:
+          type: string
+          nullable: true
+    PersistResponse:
+      type: object
+      required: [result, message, target_path]
+      properties:
+        result:
+          type: string
+          enum: [succeeded, failed]
+        message:
+          type: string
+        target_path:
+          type: string
+        persisted_revision:
+          type: string
+    SnapshotResponse:
+      type: object
+      required: [snapshot]
+      properties:
+        snapshot:
+          $ref: "#/components/schemas/EngineSnapshot"
+    ValidationMessage:
+      type: object
+      required: [scope, level, code, text]
+      properties:
+        scope:
+          type: string
+          enum: [global, domain, control]
+        level:
+          type: string
+          enum: [info, warning, error]
+        code:
+          type: string
+        text:
+          type: string
+        affected_paths:
+          type: array
+          items:
+            type: string

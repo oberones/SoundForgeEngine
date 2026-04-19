@@ -28,8 +28,9 @@ the dashboard cannot reliably drive the engine during active use, the feature
 does not meet its primary purpose.
 
 **Independent Test**: Can be fully tested by opening the UI, reviewing current
-engine status, changing core musical parameters, and confirming the running
-system reflects the updates and feedback states correctly.
+engine status, changing core musical parameters, confirming the running system
+reflects the updates and feedback states correctly, and verifying that a second
+dashboard is clearly warned that concurrent active operation is unsupported.
 
 **Acceptance Scenarios**:
 
@@ -62,8 +63,9 @@ be attractive but incomplete.
 
 **Independent Test**: Can be fully tested by visiting each configuration area,
 reviewing the available fields and constraints, editing representative values in
-every domain, and confirming that each change can be performed without leaving
-the UI.
+every domain, confirming that each change can be performed without leaving the
+UI, and verifying that externally changed values are highlighted before an edit
+in progress can overwrite them.
 
 **Acceptance Scenarios**:
 
@@ -90,32 +92,34 @@ the UI.
 
 ### User Story 3 - Drive the Application Through One Control Contract (Priority: P3)
 
-As a technical operator or integrator, I want the UI to prove full
-remote-control parity for the application so that manual use, automation, and
-future external controllers all rely on the same complete control contract.
+As a technical operator or integrator, I want the UI to prove remote-control
+parity for supported action workflows and contract-driven capabilities so that
+manual use, automation, and future external controllers all rely on the same
+complete control contract.
 
-**Why this priority**: The UI must not become a parallel control path with
-special cases. Full remote-control parity keeps the system consistent,
-automatable, and maintainable as the engine evolves.
+**Why this priority**: Live control and configuration editing cover the
+feature's value-based workflows elsewhere in the design. This story closes the
+remaining command-style interaction gap so the UI does not become a parallel
+control path with special cases.
 
-**Independent Test**: Can be fully tested by performing end-to-end operator
-tasks through the UI, including configuration reads, configuration updates,
-supported semantic actions, and state refresh, while confirming the same tasks
-remain possible through the underlying control interface.
+**Independent Test**: Can be fully tested by loading the action catalog,
+triggering supported semantic actions through the UI, confirming the resulting
+state refresh and feedback behavior, and verifying that the same action
+workflows remain possible through the underlying control interface.
 
 **Acceptance Scenarios**:
 
-1. **Given** the operator uses the UI to perform a supported control task,
+1. **Given** the operator uses the UI to trigger a supported semantic action,
    **When** the action completes, **Then** the task has been executed through
    the underlying control interface rather than a hidden direct path.
-2. **Given** the application supports command-style interactions in addition to
-   value editing, **When** the operator triggers those interactions from the UI,
-   **Then** the system provides clear confirmation, failure messaging, and an
-   updated state view.
+2. **Given** the application supports command-style interactions with optional
+   parameters or confirmation requirements, **When** the operator triggers
+   those interactions from the UI, **Then** the system provides clear
+   confirmation, failure messaging, and an updated state view.
 3. **Given** the application control surface changes over time, **When** a new
-   configurable element or supported action becomes available, **Then** the UI
-   can expose it without requiring the operator to abandon remote-control
-   parity.
+   supported action or action metadata becomes available, **Then** the UI can
+   expose it through the same control contract without requiring special-case
+   dashboard logic.
 
 ### Edge Cases
 
