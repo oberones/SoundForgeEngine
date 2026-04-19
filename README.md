@@ -1,629 +1,369 @@
-# Mystery Music Engine (Phase 6 + HID Refactor)
+# SoundForgeEngine
 
-Phase 6 implements idle mode detection and management with automatic ambient profile switching. **NEW**: Hybrid input system supporting both HID arcade controls and MIDI from Teensy (see root `SPEC.md` + `docs/ROADMAP.md`).
+SoundForgeEngine is a real-time generative music engine for performance rigs, hardware controllers, and external synthesizers. It combines a scale-aware sequencer, mutation and idle behaviors, MIDI and HID input handling, external CC profile routing, and multiple operator control surfaces: physical hardware, a REST API, a CLI, and a browser dashboard.
 
-## Implemented
+## Highlights
 
-### Phase 1 (MIDI & Routing)
-- Auto / explicit MIDI port selection (prefers name containing 'teensy').
-- Config-driven mapping (note ranges + CC) -> action strings.
-- Emission + logging of `SemanticEvent` objects.
-- Structured key=value logging formatter.
-- Unit tests for config load, routing, channel filtering, ignoring unmapped inputs, invalid range handling, MIDI auto-select edge cases.
+- Real-time sequencer with BPM, swing, density, gate length, root note, scale, step pattern, and direction control
+- Direction modes including `forward`, `backward`, `ping_pong`, `random`, `fugue`, and `song`
+- MIDI input from controller hardware plus optional HID arcade-button and joystick input
+- MIDI output and CC profile support for external synths
+- Idle-mode transitions and automatic mutation for long-running ambient behavior
+- FastAPI control surface with Swagger docs at `/docs`
+- Browser dashboard served by the engine at `/ui`
+- CLI client for scripting, monitoring, and remote control
 
-### Phase 2 (State & Sequencer)
-- Observable state container with parameter validation and change listeners.
-- High-resolution clock with drift correction and swing support.
-- Basic sequencer with step management and configurable sequence length.
-- Action handler translating semantic events to state changes and sequencer operations.
-- Manual step triggering via button presses with immediate note generation.
-- Real-time parameter updates (tempo, swing, density, sequence length, etc.).
-- Comprehensive test suite for all Phase 2 components.
-- **Complete configuration logging** - All settings logged at startup for transparency.
+## Control Surfaces
 
-### Phase 3 (Scale Mapping & Probability)
-- Scale mapping with real-time scale changes and quantized transitions.
-- Probability density gating for step events.
-- Basic note probability per step.
+| Surface | Purpose | Entry Point |
+|---------|---------|-------------|
+| Hardware input | Live control from MIDI controllers and optional HID arcade controls | `midi`, `hid`, and `mapping` sections in `config.yaml` |
+| Dashboard | Visual live control, configuration editing, action triggering, and explicit persistence | `http://localhost:8080/ui` |
+| REST API | Automation, scripting, and integration with external tools | `http://localhost:8080/docs` |
+| CLI | Terminal-friendly status, config, state, and action commands | `./mme-cli` |
 
-### Phase 4 (Integration & Polish)
-- Full integration of scale mapping with sequencer.
-- Enhanced probability gating with density control.
-- Quantized parameter changes on bar boundaries.
+## Quick Start
 
-### Phase 5 (Mutation Engine)
-- Automated parameter mutations with configurable schedules.
-- BPM drift envelopes for organic tempo variation.
-- Mutation logging and state tracking.
+### Prerequisites
 
-### Phase 5.5 (Enhanced Probability & Rhythm Patterns) ✨
-- **Per-step probability arrays** - Individual probability control for each step.
-- **Configurable step patterns** - Flexible rhythm patterns beyond hardcoded sequences.
-- **Direction patterns** - Multiple sequencer playback directions (forward, backward, ping-pong, random).
-- **Velocity variation** - Dynamic velocity based on probability values with randomness.
-- **Pattern & probability presets** - Ready-to-use rhythm and probability templates.
-- **Backward compatibility** - All existing configurations continue to work unchanged.
+- Python 3 with `venv`
+- `pip`
+- Node.js and `npm` only if you want to build the dashboard assets locally
+- MIDI or HID hardware is optional for development and testing
 
-### Phase 6 (Idle Mode) 🌙 **NEW**
-- **Automatic idle detection** - Tracks user interactions and enters idle mode after configurable timeout.
-- **Ambient profiles** - Pre-defined ambient sound profiles for idle mode (slow_fade, minimal, meditative).
-- **State preservation** - Saves active state when entering idle mode and restores it when exiting.
-- **Mutation integration** - Mutations only occur during idle periods, disabled during active use.
-- **Configurable behavior** - Timeout, profiles, and fade timing all configurable via YAML.
-- **Real-time monitoring** - Status tracking and callback system for integration with other components.
-
-### HID Refactor (Phase 6+) 🎮 **NEW**
-- **Hybrid Input System** - Supports both HID arcade controls and MIDI from Teensy simultaneously.
-- **HID Arcade Buttons** - 10 arcade buttons via USB gamepad/joystick (maps to MIDI Notes 60-69).
-- **HID Joystick** - 4-direction joystick control via USB gamepad (maps to MIDI CCs 50-53).
-- **MIDI from Teensy** - Potentiometers and switches continue to work via existing MIDI input.
-- **Seamless Integration** - Both input sources generate the same semantic events and work together.
-- **Configurable Mapping** - HID button and joystick mappings configurable via YAML.
-- **Backward Compatible** - Existing MIDI-only configurations continue to work unchanged.
-
-## Run
-
-**IMPORTANT**: All Python operations must be performed within the virtual environment.
+### Install
 
 ```bash
-# Activate virtual environment (from engine directory)
+python3 -m venv .venv
 source .venv/bin/activate
-
-# Install dependencies (including new pygame for HID support)
+pip install --upgrade pip
 pip install -r requirements.txt
 
-# Run tests
-pytest tests -q
-
-# Run specific phase tests
-pytest tests/test_idle.py -v          # Phase 6: Idle mode tests
-pytest tests/test_hid_input.py -v     # HID refactor: Hybrid input tests
-pytest tests/test_mutation.py -v      # Phase 5: Mutation engine tests  
-pytest tests/test_sequencer.py -v     # Phase 5.5: Enhanced sequencer tests
-
-# Run engine
-python src/main.py --config config.yaml --log-level INFO
-
-# Run Phase 5.5 demo (shows new features)
-python demo_phase5_5.py
-
-# Run direction patterns demo (detailed direction pattern showcase)
-python demo_direction_patterns.py
-
-# Run idle mode demo (Phase 6 - shows idle detection and ambient profiles)
-python demo_idle_mode.py
-
-# Run hybrid input demo (HID + MIDI input system) 🎮 NEW
-python demo_hybrid_input.py
-
-# Run mutation demo (shows mutation engine)
-python demo_mutation.py
+# Optional: install pygame for the alternate HID joystick backend
+pip install pygame
 ```
 
-Example log lines:
-```
-ts=2025-08-20T12:00:00 level=INFO logger=engine msg=semantic type=trigger_step source=button value=100 note=60 ch=1
-ts=2025-08-20T12:00:00 level=INFO logger=engine msg=note_event note=60 velocity=100 step=0
-ts=2025-08-20T12:00:01 level=DEBUG logger=sequencer msg=step_advance step=1 length=8
-ts=2025-08-20T12:00:01 level=INFO logger=sequencer msg=step_probabilities_set length=8 values=[1.0, 0.8, 0.6, 0.4, 0.2, 0.6, 0.8, 1.0]
-ts=2025-08-20T12:00:01 level=INFO logger=sequencer msg=step_pattern_set length=8 pattern=[True, False, True, True, False, False, True, False]
-ts=2025-08-20T12:00:01 level=DEBUG logger=sequencer msg=note_generated step=0 note=60 velocity=95 step_prob=1.00
-ts=2025-08-20T12:00:30 level=INFO logger=idle msg=idle_mode_enter
-ts=2025-08-20T12:00:30 level=INFO logger=idle msg=idle_profile_applied profile=slow_fade params=[density, bpm, scale_index, reverb_mix, filter_cutoff, master_volume]
-ts=2025-08-20T12:00:45 level=INFO logger=idle msg=idle_mode_exit
-ts=2025-08-20T12:00:45 level=INFO logger=idle msg=idle_state_restored params=[density, bpm, scale_index, reverb_mix, filter_cutoff, master_volume]
-```
+`pygame` is optional. The engine, API, dashboard backend, and MIDI-only workflows run without it. Install it only if you want the original pygame-based HID backend in addition to the `hidapi` path.
 
-Set `ENGINE_DEBUG_TIMING=1` for extra timing debug categories (future phases).
+### Build the Dashboard
 
-## Architecture (Phase 6 + HID Refactor)
+The API works without frontend assets, but the browser dashboard at `/ui` expects a built bundle.
 
-```
-HID Input (Arcade) ──┐
-                     ├─→ Hybrid Input ──→ Action Handler → State Container
-MIDI Input (Teensy) ──┘      │                   ↓              ↓
-                              ├─→ Semantic Events        State Changes
-                              └─→ Router                      ↓
-                                     ↓                   Sequencer Clock
-                              Audio Backend                   ↓
-                                                    Step Events → Pattern Gate
-                                                             ↓
-                                    Probability Gate (Per-Step)
-                                                             ↓
-                                    Scale Mapper → Note Generation
-                                                             ↓
-                                    Velocity Variation → Audio Output
-                                         
-Idle Manager ←──────────── Interaction Tracking
-     ↓
-Ambient Profiles → State Preservation/Restoration
-     ↓
-Mutation Engine (Idle-Aware) → Parameter Changes
-```
-
-## Key Components
-
-- **State**: Observable parameter store with validation and change notifications
-- **Sequencer**: High-resolution clock with step management and enhanced note generation
-- **ActionHandler**: Bridges semantic events to state changes and sequencer operations
-- **HighResClock**: Precise timing with swing support and drift correction
-- **Pattern System**: Configurable step activation patterns with presets ✨
-- **Probability Engine**: Per-step probability control with preset templates ✨
-- **Direction Engine**: Multiple sequencer playback directions (forward, backward, ping-pong, random) ✨
-- **Velocity Engine**: Dynamic velocity variation based on probability values ✨
-- **Idle Manager**: Automatic idle detection with ambient profile switching 🌙
-- **Mutation Engine**: Idle-aware parameter mutations for evolving soundscapes
-- **Hybrid Input System**: Unified input from both HID arcade controls and MIDI Teensy 🎮
-- **HID Input**: USB gamepad/joystick support for arcade buttons and joystick 🎮
-- **MIDI Input**: Existing Teensy support for potentiometers and switches 🎛️
-
-## Current Capabilities
-
-- Real-time tempo changes (60-200 BPM)
-- Swing adjustment (0-50%)
-- Sequence length control (1-32 steps)
-- Manual step triggering via button presses
-- Automatic step advancement with configurable timing
-- Parameter validation and clamping
-- Structured logging of all events
-- Scale mapping with multiple scales and real-time switching
-- Probability density gating for overall sparseness control
-- Per-step probability arrays for fine-grained control
-- Configurable step patterns for flexible rhythm creation
-- Dynamic velocity variation based on probability values
-- Automated parameter mutations for evolving soundscapes
-- Automatic idle mode with ambient profiles and state preservation
-- Idle-aware mutations (only occur during idle periods)
-
-## Configuration Parameters
-
-### Core Sequencer Parameters
-| Parameter | Type | Range | Default | Description |
-|-----------|------|-------|---------|-------------|
-| `bpm` | float | 60.0-200.0 | 110.0 | Beats per minute |
-| `swing` | float | 0.0-0.5 | 0.12 | Swing amount (0=straight, 0.5=max swing) |
-| `density` | float | 0.0-1.0 | 0.85 | Overall probability gate for all steps |
-| `sequence_length` | int | 1-32 | 8 | Number of steps in the sequence |
-
-### Legacy Probability (Backward Compatibility)
-| Parameter | Type | Range | Default | Description |
-|-----------|------|-------|---------|-------------|
-| `note_probability` | float | 0.0-1.0 | 0.9 | Global note probability (used when step_probabilities is None) |
-
-### Phase 5.5: Enhanced Patterns & Probability ✨
-| Parameter | Type | Range | Default | Description |
-|-----------|------|-------|---------|-------------|
-| `step_probabilities` | array | [0.0-1.0, ...] | None | Per-step probability values (overrides note_probability) |
-| `step_pattern` | array | [bool, ...] | None | Per-step activation pattern (overrides hardcoded even-step pattern) |
-| `direction_pattern` | string | See Direction Patterns | 'forward' | Sequencer playback direction |
-| `base_velocity` | int | 1-127 | 80 | Base MIDI velocity for notes |
-| `velocity_range` | int | 0-127 | 40 | Range for velocity variation (+/- from base) |
-
-### Scale & Mapping
-| Parameter | Type | Range | Default | Description |
-|-----------|------|-------|---------|-------------|
-| `scale_index` | int | 0-8 | 0 | Index into available scales list (see **Supported Scales** below) |
-| `root_note` | int | 0-127 | 60 | Root note for scale (MIDI note number) |
-| `quantize_scale_changes` | string | `bar`, `immediate` | `bar` | When to apply scale changes (bar boundary or immediately) |
-
-### Phase 6: Idle Mode & Mutations 🌙
-| Parameter | Type | Range | Default | Description |
-|-----------|------|-------|---------|-------------|
-| `idle.timeout_ms` | int | 1000+ | 30000 | Idle timeout in milliseconds (30s default) |
-| `idle.ambient_profile` | string | See Profiles | 'slow_fade' | Ambient profile to use in idle mode |
-| `idle.fade_in_ms` | int | 0+ | 4000 | Fade in duration for LED transitions |
-| `idle.fade_out_ms` | int | 0+ | 800 | Fade out duration for LED transitions |
-| `mutation.interval_min_s` | int | 1+ | 120 | Minimum mutation interval in seconds |
-| `mutation.interval_max_s` | int | 1+ | 240 | Maximum mutation interval in seconds |
-| `mutation.max_changes_per_cycle` | int | 0+ | 2 | Max parameter changes per mutation cycle |
-
-### HID Refactor: Arcade Controls 🎮
-| Parameter | Type | Range | Default | Description |
-|-----------|------|-------|---------|-------------|
-| `hid.device_name` | string | Device name | 'Generic USB Joystick' | Name of HID device to connect to |
-| `hid.button_mapping` | dict | Button index → action | {0-9: 'trigger_step'} | Mapping of button indices to semantic actions |
-| `hid.joystick_mapping` | dict | Direction → action | See below | Mapping of joystick directions to semantic actions |
-
-**Default HID Joystick Mapping**:
-```yaml
-joystick_mapping:
-  up: "tempo_up"         # Maps to MIDI CC 50 - Increase tempo by 5 BPM
-  down: "tempo_down"     # Maps to MIDI CC 51 - Decrease tempo by 5 BPM
-  left: "direction_left" # Maps to MIDI CC 52 - Previous direction pattern
-  right: "direction_right" # Maps to MIDI CC 53 - Next direction pattern
-```
-
-**Default HID Button Mapping**:
-```yaml
-button_mapping:
-  0: "trigger_step"  # Button 0 → MIDI Note 60
-  1: "trigger_step"  # Button 1 → MIDI Note 61
-  # ... (continues for buttons 2-9 → MIDI Notes 62-69)
-```
-
-## Pattern Presets 🎵
-
-Use `sequencer.get_pattern_preset(preset_name)` to get predefined step patterns:
-
-| Preset Name | Pattern | Description |
-|-------------|---------|-------------|
-| `four_on_floor` | `[T,F,F,F,T,F,F,F]` | Classic 4/4 kick pattern |
-| `offbeat` | `[F,T,F,T,F,T,F,T]` | Emphasis on off-beats |
-| `every_other` | `[T,F,T,F,T,F,T,F]` | Alternating on/off pattern |
-| `syncopated` | `[T,F,T,T,F,T,F,F]` | Syncopated rhythm with emphasis shifts |
-| `dense` | `[T,T,F,T,T,F,T,T]` | High-density pattern with occasional rests |
-| `sparse` | `[T,F,F,F,F,F,T,F]` | Minimal pattern with long gaps |
-| `all_on` | `[T,T,T,T,T,T,T,T]` | Every step active |
-| `all_off` | `[F,F,F,F,F,F,F,F]` | Every step inactive |
-
-*T=True (step active), F=False (step inactive)*
-
-**Usage**: 
-```python
-pattern = sequencer.get_pattern_preset('syncopated')
-sequencer.set_step_pattern(pattern)
-```
-
-## Direction Patterns 🎯
-
-Use `sequencer.set_direction_pattern(pattern_name)` to control sequencer playback direction:
-
-| Pattern Name | Description | Behavior |
-|-------------|-------------|-----------|
-| `forward` | Standard left-to-right playback | Steps advance 0→1→2→3...→N→0 |
-| `backward` | Right-to-left playback | Steps advance N→...→3→2→1→0→N |
-| `ping_pong` | Bouncing back and forth | Steps advance 0→1→2→3→2→1→0→1... |
-| `random` | Random step selection | Each step chooses randomly from all other steps |
-
-**Default**: `forward` (maintains backward compatibility)
-
-**Usage**: 
-```python
-sequencer.set_direction_pattern('ping_pong')
-# Or validate first
-direction = sequencer.get_direction_preset('backward')
-sequencer.set_direction_pattern(direction)
-```
-
-## Probability Presets 🎲
-
-Use `sequencer.get_probability_preset(preset_name, length)` to get predefined probability patterns:
-
-| Preset Name | Description | Example (8 steps) |
-|-------------|-------------|-------------------|
-| `uniform` | Equal probability for all steps | `[0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9]` |
-| `crescendo` | Gradually increasing probability | `[0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.9]` |
-| `diminuendo` | Gradually decreasing probability | `[0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.3]` |
-| `peaks` | High probability every 4th step | `[0.9, 0.4, 0.4, 0.4, 0.9, 0.4, 0.4, 0.4]` |
-| `valleys` | Low probability every 4th step | `[0.3, 0.8, 0.8, 0.8, 0.3, 0.8, 0.8, 0.8]` |
-| `alternating` | High/low alternating pattern | `[0.9, 0.3, 0.9, 0.3, 0.9, 0.3, 0.9, 0.3]` |
-| `random_low` | Random values in low range | `[0.2-0.6 random values]` |
-| `random_high` | Random values in high range | `[0.6-1.0 random values]` |
-
-**Usage**: 
-```python
-probs = sequencer.get_probability_preset('crescendo', length=8)
-sequencer.set_step_probabilities(probs)
-```
-
-## Idle Profiles 🌙
-
-Available ambient profiles for idle mode (configured via `idle.ambient_profile`):
-
-| Profile Name | Description | Characteristics |
-|--------------|-------------|-----------------|
-| `slow_fade` | Gentle ambient fade (default) | Reduced density (0.3), slower tempo (65 BPM), pentatonic scale, increased reverb, darker filter, quieter volume |
-| `minimal` | Ultra-minimal ambient | Very low density (0.15), very slow tempo (50 BPM), full reverb, very quiet |
-| `meditative` | Contemplative minor ambient | Medium density (0.4), minor scale, no swing, dark filter, moderate volume |
-
-**Behavior**: 
-- System automatically enters idle mode after configured timeout (default: 30 seconds)
-- Any MIDI interaction immediately exits idle mode and restores previous settings
-- Only parameters defined in the idle profile are changed/restored
-- Mutations are only active during idle mode
-
-## Supported Scales 🎼
-
-The following scales are available in the system (use `scale_index` 0-8 to select):
-
-| Index | Scale Name | Intervals (Semitones) | Description |
-|-------|------------|----------------------|-------------|
-| 0 | `major` | [0, 2, 4, 5, 7, 9, 11] | Standard major scale (Ionian mode) |
-| 1 | `minor` | [0, 2, 3, 5, 7, 8, 10] | Natural minor scale (Aeolian mode) |
-| 2 | `pentatonic_major` | [0, 2, 4, 7, 9] | Major pentatonic scale (5-note) |
-| 3 | `pentatonic_minor` | [0, 3, 5, 7, 10] | Minor pentatonic scale (5-note) |
-| 4 | `mixolydian` | [0, 2, 4, 5, 7, 9, 10] | Mixolydian mode (dominant 7th flavor) |
-| 5 | `blues` | [0, 3, 5, 6, 7, 10] | Blues scale (6-note) |
-| 6 | `dorian` | [0, 2, 3, 5, 7, 9, 10] | Dorian mode (minor with raised 6th) |
-| 7 | `locrian` | [0, 1, 3, 5, 6, 8, 10] | Locrian mode (diminished flavor) |
-| 8 | `chromatic` | [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | All 12 semitones |
-
-## Supported CC Profiles 🎛️
-
-The following CC profiles are available for external synthesizers (configured via `midi.cc_profile.active_profile`):
-
-### Built-in Profiles
-| Profile ID | Name | Description | Parameter Count |
-|------------|------|-------------|-----------------|
-| `korg_nts1_mk2` | Korg NTS-1 MK2 | Complete parameter mapping for Korg NTS-1 MK2 digital synthesizer | 15+ parameters |
-| `generic_analog` | Generic Analog Synth | Standard analog subtractive synthesis parameters | 10+ parameters |
-| `fm_synth` | FM Synthesizer | Operator-based FM synthesis with 2 operators | 8+ parameters |
-| `waldorf_streichfett` | Waldorf Streichfett | Dual engine string synthesizer with string, solo, and effects sections | 15+ parameters |
-
-### Custom Profiles
-You can also define custom CC profiles in `config.yaml` under the `cc_profiles` section with your own parameter mappings.
-
-### CC Parameter Curve Types
-| Curve Type | Description | Best For |
-|------------|-------------|----------|
-| `linear` | Direct 0-1 to CC value mapping | Most parameters |
-| `exponential` | Smoother control at low values | Filters, envelopes |
-| `logarithmic` | More precision at high values | Frequencies |
-| `stepped` | Discrete values | Waveform selection, modes |
-
-## Configuration Example (config.yaml)
-
-```yaml
-# HID Input Configuration (arcade buttons + joystick) 🎮 NEW
-hid:
-  device_name: "Generic USB Joystick"
-  button_mapping:
-    0: "trigger_step"    # Button 0 → Note 60
-    1: "trigger_step"    # Button 1 → Note 61
-    # ... continues for buttons 2-9
-  joystick_mapping:
-    up: "tempo_up"         # Joystick Up → Increase tempo by 5 BPM
-    down: "tempo_down"     # Joystick Down → Decrease tempo by 5 BPM
-    left: "direction_left" # Joystick Left → Previous direction pattern
-    right: "direction_right" # Joystick Right → Next direction pattern
-
-# MIDI Input Configuration (Teensy potentiometers + switches)
-midi:
-  input_port: "auto"
-  output_port: "RK006 OUT_ALL"
-  input_channel: 1
-  output_channel: 12
-
-# Note: Button and joystick mappings moved to HID section
-# MIDI mapping now only contains Teensy potentiometers and switches
-mapping:
-  buttons: {}  # Empty - buttons handled by HID
-  ccs:
-    "21": filter_cutoff      # K1 potentiometer
-    "22": filter_resonance   # K2 potentiometer
-    "60": osc_type          # S1 switch
-    "61": filter_type       # S2 switch
-    # No joystick CCs - handled by HID
-
-idle:
-  timeout_ms: 30000          # 30 second timeout
-  ambient_profile: slow_fade # Choose: slow_fade, minimal, meditative  
-  fade_in_ms: 4000          # 4 second LED fade in
-  fade_out_ms: 800          # 0.8 second LED fade out
-
-mutation:
-  interval_min_s: 120       # 2 minute minimum between mutations
-  interval_max_s: 240       # 4 minute maximum between mutations  
-  max_changes_per_cycle: 2  # Max 2 parameters changed per mutation
-```
-
-## Usage Examples
-
-### Setting Custom Step Probabilities
-```python
-# Set individual probabilities for each step
-sequencer.set_step_probabilities([1.0, 0.8, 0.6, 0.4, 0.2, 0.6, 0.8, 1.0])
-
-# Or use a preset
-probs = sequencer.get_probability_preset('crescendo', length=8)
-sequencer.set_step_probabilities(probs)
-```
-
-### Setting Custom Step Patterns
-```python
-# Set a custom pattern
-sequencer.set_step_pattern([True, False, True, True, False, False, True, False])
-
-# Or use a preset
-pattern = sequencer.get_pattern_preset('syncopated')
-sequencer.set_step_pattern(pattern)
-```
-
-### Setting Direction Patterns
-```python
-# Set direction pattern
-sequencer.set_direction_pattern('ping_pong')
-
-# Or use a preset (validates the name)
-direction = sequencer.get_direction_preset('backward')
-sequencer.set_direction_pattern(direction)
-```
-
-### Configuring Velocity Variation
-```python
-# Set base velocity and variation range
-sequencer.set_velocity_params(base_velocity=100, velocity_range=30)
-# Results in velocities ranging roughly from 70-130 based on step probability
-```
-
-### Backward Compatibility
-```python
-# Old-style configuration still works
-state.set('note_probability', 0.7)  # Applied to all steps when step_probabilities is None
-# Hardcoded even-step pattern used when step_pattern is None
-```
-
-## Dynamic Configuration API 🌐 **NEW**
-
-The engine now includes a REST API for real-time configuration changes without requiring a restart.
-
-### Features
-- **Real-time updates**: Modify any configuration parameter while the engine runs
-- **Validation**: All changes are validated before application
-- **System state**: Monitor internal state and trigger events
-- **Auto-documentation**: Interactive API docs at `/docs`
-
-### Quick Start
 ```bash
-# Start the engine (API enabled by default on port 8080)
-python src/main.py --config config.yaml
+cd frontend
+npm install
+npm run build
+cd ..
+```
 
-# In another terminal - update BPM
+### Local UI Development
+
+For the fastest local testing loop, run the engine and the Vite dev server side by side.
+
+Terminal 1:
+
+```bash
+source .venv/bin/activate
+python src/main.py --config config.yaml --log-level INFO
+```
+
+Terminal 2:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open [http://127.0.0.1:5173/ui/](http://127.0.0.1:5173/ui/).
+
+The Vite dev server proxies dashboard API requests to the engine on `127.0.0.1:8080`, so this is the best setup for day-to-day UI work. For a more production-like smoke test, build the frontend and use the engine-served dashboard at `/ui`.
+
+### Run the Engine
+
+```bash
+source .venv/bin/activate
+python src/main.py --config config.yaml --log-level INFO
+```
+
+With the default `config.yaml`, the control surfaces are:
+
+- Dashboard: [http://localhost:8080/ui](http://localhost:8080/ui)
+- API docs: [http://localhost:8080/docs](http://localhost:8080/docs)
+- API status: [http://localhost:8080/status](http://localhost:8080/status)
+
+If the frontend bundle has not been built yet, `/ui` returns a setup page explaining how to build it.
+
+## Using SoundForgeEngine
+
+### 1. Configure the Engine
+
+The engine loads YAML configuration from the file passed to `--config`. The repository root includes a working example at [config.yaml](config.yaml).
+
+Typical workflow:
+
+1. Copy or edit `config.yaml`
+2. Set MIDI ports, channels, and CC profile
+3. Configure sequencer behavior
+4. Optionally map HID buttons and joystick directions
+5. Enable the API if you want the dashboard, CLI, or remote control
+
+### 2. Start the Engine
+
+```bash
+source .venv/bin/activate
+python src/main.py --config config.yaml --log-level INFO
+```
+
+The engine loads the config, initializes MIDI output, starts the API server if enabled, starts hybrid input, and begins sequencing.
+
+### 3. Choose a Control Surface
+
+#### Browser Dashboard
+
+Open `/ui` to:
+
+- Monitor current engine status
+- Adjust live parameters
+- Browse all configuration domains
+- Trigger supported semantic actions
+- Review pending configuration changes
+- Persist supported settings explicitly back to the config file
+
+Dashboard edits update the running session first. Persistence is an explicit separate action.
+
+#### CLI
+
+The repo includes a wrapper script and a Python CLI client:
+
+- [mme-cli](mme-cli)
+- [mme-cli.py](mme-cli.py)
+
+Examples:
+
+```bash
+./mme-cli status
+./mme-cli config get sequencer.bpm
+./mme-cli quick bpm 128
+./mme-cli event trigger set_direction_pattern random
+./mme-cli monitor
+```
+
+#### REST API
+
+Examples:
+
+```bash
+curl http://localhost:8080/status
+
+curl http://localhost:8080/config/sequencer.bpm
+
 curl -X POST http://localhost:8080/config \
   -H "Content-Type: application/json" \
-  -d '{"path": "sequencer.bpm", "value": 120.0}'
+  -d '{"path":"sequencer.bpm","value":124,"apply_immediately":true}'
 
-# Change sequencer direction
 curl -X POST "http://localhost:8080/actions/semantic?action=set_direction_pattern&value=ping_pong"
-
-# Get current state
-curl http://localhost:8080/state
 ```
 
-### Python Client Example
-```python
-from examples.api_demo import APIClient
+For custom clients:
 
-client = APIClient("http://localhost:8080")
+- `POST /config` updates the in-memory config, can apply changes immediately, and returns a revision token
+- `POST /config/persist` writes the current config back to disk using a current revision token
+- `GET /actions/catalog` lists supported operator actions
+- `GET /ui/bootstrap` and `GET /ui/snapshot` expose dashboard metadata and revision-aware snapshots
 
-# Update configuration
-client.update_config("sequencer.density", 0.8)
-client.update_config("mutation.interval_min_s", 45)
+## Configuration Reference
 
-# Trigger events
-client.trigger_semantic_event("set_direction_pattern", "random")
+All supported configuration is defined in [src/config.py](src/config.py). The top-level sections are `logging`, `midi`, `hid`, `mapping`, `sequencer`, `scales`, `mutation`, `idle`, `synth`, `api`, and `cc_profiles`.
 
-# Monitor state
-state = client.get_state()
-print(f"Current BPM: {state['bpm']}")
-```
+### Logging
 
-### API Configuration
+| Key | Values | Purpose |
+|-----|--------|---------|
+| `logging.level` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` | Engine log verbosity |
+
+### MIDI
+
+| Key | Values | Purpose |
+|-----|--------|---------|
+| `midi.input_port` | Port name or `auto` | MIDI input source |
+| `midi.output_port` | Port name or `null` | External synth/output destination |
+| `midi.input_channel` | Integer channel | MIDI input channel filter |
+| `midi.output_channel` | Integer channel | MIDI output channel |
+| `midi.clock.enabled` | `true` / `false` | Enable MIDI clock output |
+| `midi.clock.send_start_stop` | `true` / `false` | Send transport start/stop |
+| `midi.clock.send_song_position` | `true` / `false` | Send song-position messages |
+| `midi.cc_profile.active_profile` | String profile name | Active CC mapping profile for external hardware |
+| `midi.cc_profile.parameter_smoothing` | `true` / `false` | Smooth parameter changes before sending CC |
+| `midi.cc_profile.cc_throttle_ms` | Integer milliseconds | Minimum time between outgoing CC messages |
+
+### HID Input
+
+| Key | Values | Purpose |
+|-----|--------|---------|
+| `hid.device_name` | String | HID device name match |
+| `hid.button_mapping` | Button index to action map | Map arcade/gamepad buttons to semantic actions |
+| `hid.joystick_mapping` | Direction to action map | Map joystick directions to semantic actions |
+
+Default joystick actions are `tempo_up`, `tempo_down`, `direction_left`, and `direction_right`. You can map these controls to other semantic actions documented in [docs/reference/SEMANTIC_ACTIONS_REFERENCE.md](docs/reference/SEMANTIC_ACTIONS_REFERENCE.md).
+
+### MIDI-to-Action Mapping
+
+| Key | Values | Purpose |
+|-----|--------|---------|
+| `mapping.buttons` | MIDI note or note-range to action map | Map incoming note events to semantic actions |
+| `mapping.ccs` | MIDI CC number to action map | Map incoming CC messages to semantic actions |
+
+Examples:
+
 ```yaml
-api:
-  enabled: true
-  port: 8080
-  host: "0.0.0.0"    # Set to "127.0.0.1" for localhost-only
-  log_level: "info"
+mapping:
+  buttons:
+    "60-69": trigger_step
+  ccs:
+    "27": tempo
+    "21": filter_cutoff
 ```
 
-For complete API documentation, see [`docs/API_DOCUMENTATION.md`](docs/API_DOCUMENTATION.md).
+### Sequencer
 
-## Command Line Interface 🖥️ **NEW**
+| Key | Values | Purpose |
+|-----|--------|---------|
+| `sequencer.steps` | Integer | Number of steps in the sequence |
+| `sequencer.bpm` | Float | Tempo |
+| `sequencer.swing` | `0.0` to `0.5` | Swing amount |
+| `sequencer.density` | `0.0` to `1.0` | Global probability gate |
+| `sequencer.root_note` | MIDI note `0` to `127` | Scale root |
+| `sequencer.gate_length` | `0.1` to `1.0` | Note duration as a fraction of step length |
+| `sequencer.quantize_scale_changes` | `bar` or `immediate` | When scale changes take effect |
+| `sequencer.step_pattern` | Preset name or `null` | Named step pattern preset |
+| `sequencer.direction_pattern` | `forward`, `backward`, `ping_pong`, `random`, `fugue`, `song` | Playback mode |
+| `sequencer.voices` | `1` to `4` | Voice count for multi-voice modes |
+| `sequencer.note_division` | `whole`, `half`, `quarter`, `eighth`, `sixteenth` | Step timing division |
 
-A powerful CLI client provides easy command-line access to the API for automation and live control.
+### Scales
 
-### Quick Start
+| Key | Values | Purpose |
+|-----|--------|---------|
+| `scales` | Non-empty list of scale names | Scales available to the sequencer |
+
+Example values used in the repo include `major`, `minor`, `blues`, `pentatonic_major`, `pentatonic_minor`, `mixolydian`, `dorian`, and `locrian`.
+
+### Mutation and Idle Behavior
+
+| Key | Values | Purpose |
+|-----|--------|---------|
+| `mutation.interval_min_s` | Integer seconds | Minimum delay between mutation cycles |
+| `mutation.interval_max_s` | Integer seconds | Maximum delay between mutation cycles |
+| `mutation.max_changes_per_cycle` | Integer | Maximum parameter changes per cycle |
+| `idle.timeout_ms` | Integer milliseconds | Idle timeout before ambient behavior begins |
+| `idle.ambient_profile` | String profile name | Ambient profile to activate while idle |
+| `idle.fade_in_ms` | Integer milliseconds | Idle-entry fade duration |
+| `idle.fade_out_ms` | Integer milliseconds | Idle-exit fade duration |
+| `idle.smooth_bpm_transitions` | `true` / `false` | Smooth BPM changes during idle transitions |
+| `idle.bpm_transition_duration_s` | Float seconds | Idle BPM transition duration |
+
+The repository config uses profiles such as `slow_fade`, `meditative`, and `rhythmic`.
+
+### Synth and External Profiles
+
+| Key | Values | Purpose |
+|-----|--------|---------|
+| `synth.backend` | Currently `supercollider` | Synth backend identifier |
+| `synth.voices` | Integer | Voice-allocation count |
+| `cc_profiles` | Mapping of profile names to arbitrary config objects | Custom external synth CC profile definitions |
+
+### API
+
+| Key | Values | Purpose |
+|-----|--------|---------|
+| `api.enabled` | `true` / `false` | Enable the API server |
+| `api.port` | Integer port | HTTP port for API and dashboard |
+| `api.host` | Host string such as `127.0.0.1` or `0.0.0.0` | Network binding |
+| `api.log_level` | Uvicorn/FastAPI log level string | API server logging |
+
+If the API is exposed beyond localhost, place it behind a trusted LAN or reverse proxy. There is no in-app authentication layer.
+
+## Supported Runtime Surfaces
+
+### Dashboard and API
+
+- Dashboard shell: `/ui`
+- Dashboard metadata: `/ui/bootstrap`
+- Dashboard snapshot polling: `/ui/snapshot`
+- Swagger/OpenAPI docs: `/docs`
+- Health/status: `/status`
+- Config inspection and updates: `/config`, `/config/{path}`, `/config/schema`, `/config/mappings`
+- Persistence: `/config/persist`
+- State inspection/reset: `/state`, `/state/reset`
+- Actions: `/actions/catalog`, `/actions/semantic`
+
+### Semantic Actions Exposed by the Dashboard
+
+The current dashboard action catalog includes:
+
+- `trigger_step`
+- `tempo_up`
+- `tempo_down`
+- `direction_left`
+- `direction_right`
+- `set_direction_pattern`
+- `set_step_pattern`
+- `reload_cc_profile`
+
+For broader action vocabulary and hardware-mapping ideas, see [docs/reference/SEMANTIC_ACTIONS_REFERENCE.md](docs/reference/SEMANTIC_ACTIONS_REFERENCE.md).
+
+## Testing
+
+### Python Test Suite
+
+Run the full backend test suite:
+
 ```bash
-# Show system status
-./mme-cli status
-
-# Change BPM quickly
-./mme-cli quick bpm 140
-
-# Monitor in real-time
-./mme-cli monitor
-
-# Trigger pattern changes
-./mme-cli event trigger set_direction_pattern ping_pong
-
-# Get/set any configuration
-./mme-cli config get sequencer.density
-./mme-cli config set sequencer.density 0.75
+source .venv/bin/activate
+pytest tests -q
 ```
 
-### Features
-- **Intuitive commands**: `status`, `config`, `state`, `event`, `monitor`, `quick`
-- **Auto-completion**: Bash completion for commands and parameters
-- **Real-time monitoring**: Live system state updates
-- **Error handling**: Clear error messages and connection diagnostics
-- **Remote control**: Connect to any MME instance via URL
-- **Scripting friendly**: Perfect for automation and macros
+Useful focused commands:
 
-### Installation
 ```bash
-# Make executable (one-time setup)
-chmod +x mme-cli mme-cli.py
-
-# Enable auto-completion (optional)
-source mme-cli-completion.bash
+pytest tests/test_config.py -v
+pytest tests/test_sequencer.py -v
+pytest tests/test_hid_input.py -v
+pytest tests/unit tests/contract tests/integration tests/test_api_server.py -q
 ```
 
-For complete CLI documentation, see [`docs/CLI_DOCUMENTATION.md`](docs/CLI_DOCUMENTATION.md).
+Notes:
 
-### Idle Mode Control (Phase 6) 🌙
-```python
-# Manual idle mode control (for testing/debugging)
-idle_manager.force_idle()    # Enter idle mode immediately
-idle_manager.force_active()  # Exit idle mode immediately
+- `tests/conftest.py` adds `src/` to `PYTHONPATH`, so tests run from the repo root
+- The pygame-specific HID tests skip automatically if `pygame` is not installed
+- Core unit and integration tests do not require physical hardware, but live rig validation is still recommended before performance use
 
-# Monitor idle status
-status = idle_manager.get_status()
-print(f"Idle: {status['is_idle']}")
-print(f"Time to idle: {status['time_to_idle']:.1f}s")
+### Frontend Tests
 
-# Register for idle state change notifications
-def on_idle_change(is_idle):
-    print(f"Idle mode: {'ON' if is_idle else 'OFF'}")
-
-idle_manager.add_idle_state_callback(on_idle_change)
+```bash
+cd frontend
+npm test
+npm run build
 ```
 
-### Mutation Engine Control
-```python
-# Check if mutations are enabled (only when idle)
-enabled = mutation_engine.are_mutations_enabled()
+The frontend workspace also includes Playwright specs under `frontend/tests/e2e/`.
 
-# Force a mutation (for testing - only works when enabled)
-mutation_engine.force_mutation()
+For interactive UI testing during development, use `npm run dev` with the engine running locally and open `http://127.0.0.1:5173/ui/`.
 
-# Get mutation statistics
-stats = mutation_engine.get_stats()
-print(f"Total mutations: {stats['total_mutations']}")
-print(f"Next mutation in: {stats['time_to_next_mutation_s']:.1f}s")
+## Project Layout
 
-# Get mutation history
-history = mutation_engine.get_history(5)  # Last 5 mutations
-for event in history:
-    print(f"{event.parameter}: {event.old_value} → {event.new_value}")
-```
+| Path | Purpose |
+|------|---------|
+| [src](src) | Python engine, API server, and runtime components |
+| [frontend](frontend) | React/Vite dashboard |
+| [config.yaml](config.yaml) | Example runtime configuration |
+| [tests](tests) | Backend unit, contract, and integration tests |
+| [docs](docs) | Extended API, CLI, architecture, and implementation docs |
 
-## Next (Phase 7)
-- LED event emission for interaction feedback and idle state visualization.
-- Enhanced integration with Teensy firmware for visual feedback.
-- Additional ambient profiles and customization options.
+## Further Documentation
 
-## Configuration Reference 📖
-
-### Complete Configuration Value Lists
-
-For easy reference, here are all supported values for key configuration options:
-
-**Scales** (`scale_index` 0-8):
-- `major`, `minor`, `pentatonic_major`, `pentatonic_minor`, `mixolydian`, `blues`, `dorian`, `locrian`, `chromatic`
-
-**Ambient Profiles** (`idle.ambient_profile`):
-- `slow_fade`, `minimal`, `meditative`
-
-**Direction Patterns** (`direction_pattern`):
-- `forward`, `backward`, `ping_pong`, `random`
-
-**Step Pattern Presets** (use `sequencer.get_pattern_preset(name)`):
-- `four_on_floor`, `offbeat`, `every_other`, `syncopated`, `dense`, `sparse`, `all_on`, `all_off`
-
-**Probability Presets** (use `sequencer.get_probability_preset(name, length)`):
-- `uniform`, `crescendo`, `diminuendo`, `peaks`, `valleys`, `alternating`, `random_low`, `random_high`
-
-**Quantize Scale Changes** (`quantize_scale_changes`):
-- `bar` (apply at bar boundaries), `immediate` (apply immediately)
-
-**CC Profiles** (`midi.cc_profile.active_profile`):
-- `korg_nts1_mk2`, `generic_analog`, `fm_synth`, `waldorf_streichfett`, plus any custom profiles defined in config
-
-**CC Curve Types** (for custom profiles):
-- `linear`, `exponential`, `logarithmic`, `stepped`
-
-**Logging Levels** (`logging.level`):
-- `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
-
-License: Apache-2.0
+- [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md)
+- [docs/CLI_DOCUMENTATION.md](docs/CLI_DOCUMENTATION.md)
+- [docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md)
+- [docs/reference/SEMANTIC_ACTIONS_REFERENCE.md](docs/reference/SEMANTIC_ACTIONS_REFERENCE.md)

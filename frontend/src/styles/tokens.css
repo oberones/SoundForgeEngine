@@ -1,0 +1,25 @@
+:root {
+  --bg: #f4efe4;
+  --surface: rgba(255, 248, 236, 0.84);
+  --surface-strong: #fff7ea;
+  --surface-ink: #13211f;
+  --card-border: rgba(19, 33, 31, 0.12);
+  --card-shadow: 0 22px 60px rgba(19, 33, 31, 0.12);
+  --accent: #1f6b57;
+  --accent-soft: #d7efe6;
+  --accent-strong: #174f41;
+  --warning: #b86516;
+  --warning-soft: #ffe7c9;
+  --danger: #b33b2e;
+  --danger-soft: #ffd8d4;
+  --success: #256b32;
+  --success-soft: #d9efdb;
+  --text: #13211f;
+  --muted: #556663;
+  --line: rgba(19, 33, 31, 0.1);
+  --font-display: "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --radius-lg: 1.6rem;
+  --radius-md: 1rem;
+  --radius-sm: 0.7rem;
+}

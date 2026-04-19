@@ -84,7 +84,7 @@ if __name__ == "__main__":
     success = quick_test()
     if success:
         print(f"\n🎯 Ready to run full debug script:")
-        print(f"   /Users/oberon/Projects/coding/other/MysteryMelodyMachine/rpi-engine/.venv/bin/python debug_midi_input.py")
+        print(f"   /Users/oberon/Projects/coding/other/SoundForgeEngine/rpi-engine/.venv/bin/python debug_midi_input.py")
     else:
         print(f"\n❌ MIDI input issues detected - check your MIDI setup")
     

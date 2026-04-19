@@ -8,8 +8,6 @@ import pytest
 import threading
 import time
 import requests
-from unittest.mock import Mock, patch
-
 from config import RootConfig
 from api_server import APIServer, create_api_server, ConfigUpdateRequest
 from state import get_state, reset_state
@@ -218,8 +216,8 @@ class TestAPIIntegration:
         response = requests.get(f"{self.base_url}/")
         assert response.status_code == 200
         data = response.json()
-        assert data["name"] == "Mystery Music Engine API"
-        assert data["version"] == "1.0.0"
+        assert data["name"] == "SoundForgeEngine API"
+        assert data["version"] == "2.0.0"
     
     def test_get_status(self):
         """Test status endpoint."""
@@ -261,6 +259,7 @@ class TestAPIIntegration:
         assert data["success"] is True
         assert data["new_value"] == 125.0
         assert data["applied_to_state"] is True
+        assert data["revision"].startswith("r")
         
         # Verify the change
         response = requests.get(f"{self.base_url}/config/sequencer.bpm")
@@ -284,6 +283,7 @@ class TestAPIIntegration:
         data = response.json()
         assert "triggered successfully" in data["message"]
         assert "set_direction_pattern" in data["message"]
+        assert data["revision"].startswith("r")
         
         # Test another semantic event
         response = requests.post(

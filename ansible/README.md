@@ -109,7 +109,7 @@ The health check script runs automatically every 5 minutes and logs to `/var/log
 
 Run manually:
 ```bash
-cd ~/MysteryMelodyMachine/rpi-engine
+cd ~/SoundForgeEngine/rpi-engine
 ./health-check.sh
 ```
 
@@ -143,7 +143,7 @@ groups $USER
 
 **Python dependencies missing:**
 ```bash
-cd ~/MysteryMelodyMachine/rpi-engine
+cd ~/SoundForgeEngine/rpi-engine
 source .venv/bin/activate
 pip install -r requirements.txt
 ```

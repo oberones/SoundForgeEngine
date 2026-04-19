@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a comprehensive list of semantic actions that can be mapped to physical hardware controls in the Mystery Melody Machine. Actions are categorized by the type of control they're best suited for: switch buttons (discrete/toggle actions) or potentiometers (continuous control).
+This document provides a comprehensive list of semantic actions that can be mapped to physical hardware controls in SoundForgeEngine. Actions are categorized by the type of control they're best suited for: switch buttons (discrete/toggle actions) or potentiometers (continuous control).
 
 ---
 
