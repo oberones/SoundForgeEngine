@@ -210,6 +210,96 @@ class TestMidiOutputUnit:
         assert not output.is_connected
 
 
+class TestMidiOutputOmniChannel:
+    """Test omni channel mode (channel=0 sends on all 16 channels)."""
+    
+    @patch('midi_out.mido.open_output')
+    def test_omni_note_on_sends_all_channels(self, mock_open):
+        """Test note on with omni channel sends on all 16 channels."""
+        mock_port = Mock()
+        mock_open.return_value = mock_port
+        
+        output = MidiOutput('Test Port', channel=0)
+        result = output.send_note_on(64, 100)
+        
+        assert result is True
+        assert mock_port.send.call_count == 16
+        sent_channels = [c[0][0].channel for c in mock_port.send.call_args_list]
+        assert sent_channels == list(range(16))
+        for c in mock_port.send.call_args_list:
+            assert c[0][0].type == 'note_on'
+            assert c[0][0].note == 64
+            assert c[0][0].velocity == 100
+    
+    @patch('midi_out.mido.open_output')
+    def test_omni_note_off_sends_all_channels(self, mock_open):
+        """Test note off with omni channel sends on all 16 channels."""
+        mock_port = Mock()
+        mock_open.return_value = mock_port
+        
+        output = MidiOutput('Test Port', channel=0)
+        result = output.send_note_off(64)
+        
+        assert result is True
+        assert mock_port.send.call_count == 16
+        sent_channels = [c[0][0].channel for c in mock_port.send.call_args_list]
+        assert sent_channels == list(range(16))
+    
+    @patch('midi_out.mido.open_output')
+    def test_omni_control_change_sends_all_channels(self, mock_open):
+        """Test control change with omni channel sends on all 16 channels."""
+        mock_port = Mock()
+        mock_open.return_value = mock_port
+        
+        output = MidiOutput('Test Port', channel=0)
+        result = output.send_control_change(7, 127)
+        
+        assert result is True
+        assert mock_port.send.call_count == 16
+        sent_channels = [c[0][0].channel for c in mock_port.send.call_args_list]
+        assert sent_channels == list(range(16))
+    
+    @patch('midi_out.mido.open_output')
+    def test_explicit_omni_channel_argument(self, mock_open):
+        """Test passing channel=0 explicitly overrides default channel."""
+        mock_port = Mock()
+        mock_open.return_value = mock_port
+        
+        output = MidiOutput('Test Port', channel=5)
+        result = output.send_note_on(64, 100, channel=0)
+        
+        assert result is True
+        assert mock_port.send.call_count == 16
+    
+    @patch('midi_out.mido.open_output')
+    def test_explicit_channel_overrides_omni_default(self, mock_open):
+        """Test explicit channel overrides omni default."""
+        mock_port = Mock()
+        mock_open.return_value = mock_port
+        
+        output = MidiOutput('Test Port', channel=0)
+        result = output.send_note_on(64, 100, channel=3)
+        
+        assert result is True
+        mock_port.send.assert_called_once()
+        sent_msg = mock_port.send.call_args[0][0]
+        assert sent_msg.channel == 2  # 0-based (channel 3 -> 2)
+    
+    @patch('midi_out.mido.open_output')
+    def test_omni_all_notes_off_sends_all_channels(self, mock_open):
+        """Test all notes off with omni channel sends on all 16 channels."""
+        mock_port = Mock()
+        mock_open.return_value = mock_port
+        
+        output = MidiOutput('Test Port', channel=0)
+        result = output.send_all_notes_off()
+        
+        assert result is True
+        assert mock_port.send.call_count == 16
+        for c in mock_port.send.call_args_list:
+            assert c[0][0].control == 123  # All Notes Off
+
+
 class TestNullMidiOutput:
     """Test the null MIDI output implementation."""
     

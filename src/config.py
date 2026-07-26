@@ -18,8 +18,8 @@ class CCProfileConfig(BaseModel):
 class MidiConfig(BaseModel):
     input_port: str = "auto"
     output_port: Optional[str] = None  # Optional MIDI output port
-    input_channel: int = 1
-    output_channel: int = 1
+    input_channel: int = Field(1, ge=1, le=16)
+    output_channel: int = Field(1, ge=0, le=16)  # 0 = send on all 16 channels
     clock: MidiClockConfig = MidiClockConfig()
     cc_profile: CCProfileConfig = CCProfileConfig()
 
