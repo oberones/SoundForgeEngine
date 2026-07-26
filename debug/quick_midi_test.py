@@ -14,7 +14,7 @@ def quick_test():
     print("🎹 Quick MIDI Input Test")
     print("=" * 30)
     
-    # List available ports
+    # List available input ports
     print("📋 Available MIDI Input Ports:")
     try:
         ports = mido.get_input_names()
@@ -29,6 +29,20 @@ def quick_test():
         print(f"   ❌ Error listing ports: {e}")
         return False
     
+    # List available output ports
+    print("\n📋 Available MIDI Output Ports:")
+    try:
+        output_ports = mido.get_output_names()
+        if not output_ports:
+            print("   ⚠️  No MIDI output ports found")
+        
+        for i, port in enumerate(output_ports, 1):
+            print(f"   {i}. {port}")
+        
+    except Exception as e:
+        print(f"   ❌ Error listing output ports: {e}")
+        output_ports = []
+    
     # Load config
     print(f"\n📋 Configuration:")
     try:
@@ -37,13 +51,18 @@ def quick_test():
         
         input_port = config.get('midi', {}).get('input_port', 'auto')
         input_channel = config.get('midi', {}).get('input_channel', 1)
+        output_port = config.get('midi', {}).get('output_port', 'auto')
+        output_channel = config.get('midi', {}).get('output_channel', 1)
         
         print(f"   Input Port: {input_port}")
         print(f"   Input Channel: {input_channel}")
+        print(f"   Output Port: {output_port}")
+        print(f"   Output Channel: {output_channel}")
         
     except Exception as e:
         print(f"   ⚠️  Could not load config: {e}")
         input_port = 'auto'
+        output_port = 'auto'
     
     # Test connection
     print(f"\n🔌 Testing Connection to '{input_port}':")

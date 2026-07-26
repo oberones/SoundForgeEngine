@@ -1,110 +1,92 @@
-logging:
-  level: DEBUG 
-
 midi:
-  input_port: "auto"
-  output_port: "RK006 OUT_ALL"  # Set to "auto" or specific port name to enable MIDI output
-
+  input_port: auto
+  output_port: RK006 OUT_ALL
   input_channel: 1
   output_channel: 14
-
   clock:
-    enabled: true            # Enable MIDI clock output to sync external devices
-    send_start_stop: true     # Send MIDI start/stop messages  
-    send_song_position: true  # Send song position pointer messages
-
+    enabled: true
+    send_start_stop: true
+    send_song_position: true
   cc_profile:
-    active_profile: "roland_jx08" # Active CC profile (korg_nts1_mk2, roland_jx08, waldorf_streichfett, generic_analog, fm_synth)
-    parameter_smoothing: true       # Enable parameter smoothing for CC messages
-    cc_throttle_ms: 10              # Minimum milliseconds between CC messages (latency optimization)
-
-# HID Input Configuration (arcade buttons + joystick)
+    active_profile: roland_jx08
+    parameter_smoothing: true
+    cc_throttle_ms: 10
 hid:
-  device_name: "Generic USB Joystick"
+  device_name: Generic USB Joystick
   button_mapping:
-    0: "trigger_step"    # Button 0 -> trigger_step (maps to MIDI note 60)
-    1: "trigger_step"    # Button 1 -> trigger_step (maps to MIDI note 61)
-    2: "trigger_step"    # Button 2 -> trigger_step (maps to MIDI note 62)
-    3: "trigger_step"    # Button 3 -> trigger_step (maps to MIDI note 63)
-    4: "trigger_step"    # Button 4 -> trigger_step (maps to MIDI note 64)
-    5: "trigger_step"    # Button 5 -> trigger_step (maps to MIDI note 65)
-    6: "trigger_step"    # Button 6 -> trigger_step (maps to MIDI note 66)
-    7: "trigger_step"    # Button 7 -> trigger_step (maps to MIDI note 67)
-    8: "trigger_step"    # Button 8 -> trigger_step (maps to MIDI note 68)
-    9: "trigger_step"    # Button 9 -> trigger_step (maps to MIDI note 69)
+    0: trigger_step
+    1: trigger_step
+    2: trigger_step
+    3: trigger_step
+    4: trigger_step
+    5: trigger_step
+    6: trigger_step
+    7: trigger_step
+    8: trigger_step
+    9: trigger_step
   joystick_mapping:
-    up: "tempo_up"         # Joystick Up -> increase tempo (maps to MIDI CC 50)
-    down: "tempo_down"     # Joystick Down -> decrease tempo (maps to MIDI CC 51)
-    left: "direction_left" # Joystick Left -> previous direction pattern (maps to MIDI CC 52)  
-    right: "direction_right" # Joystick Right -> next direction pattern (maps to MIDI CC 53)
-
-# MIDI Input Mapping (from Teensy - potentiometers and switches only now)
+    up: tempo_up
+    down: tempo_down
+    left: direction_left
+    right: direction_right
 mapping:
-  buttons: {}  # Empty - buttons now handled by HID
+  buttons: {}
   ccs:
-    "2": sequence_length
-    "27": tempo
-    "21": filter_cutoff      # K1 -> NTS-1 Filter Cutoff (CC 43)
-    "22": filter_resonance   # K2 -> NTS-1 Filter Resonance (CC 44)
-    "23": eg_attack          # K3 -> NTS-1 EG Attack (CC 16)
-    "24": eg_release         # K4 -> NTS-1 EG Release (CC 19)
-    "25": reverb_mix         # K5 -> NTS-1 Reverb Mix (CC 36)
-    "26": delay_mix          # K6 -> NTS-1 Delay Mix (CC 33)
-    # Joystick controls (now managed by HID, but CC mapping kept for compatibility)
-    "50": tempo_up           # Joystick Up -> tempo increase  
-    "51": tempo_down         # Joystick Down -> tempo decrease
-    "52": direction_left     # Joystick Left -> previous direction pattern
-    "53": direction_right    # Joystick Right -> next direction pattern
-    # No joystick mappings - now handled by HID
-    "60": osc_type           # S1 -> NTS-1 OSC Type (CC 53)
-    "61": filter_type        # S2 -> NTS-1 Filter Type (CC 42)
-    "62": mod_type           # S3 -> NTS-1 MOD Type (CC 88)
-
+    '2': sequence_length
+    '27': tempo
+    '21': filter_cutoff
+    '22': filter_resonance
+    '23': eg_attack
+    '24': eg_release
+    '25': reverb_mix
+    '26': delay_mix
+    '50': tempo_up
+    '51': tempo_down
+    '52': direction_left
+    '53': direction_right
+    '60': osc_type
+    '61': filter_type
+    '62': mod_type
 sequencer:
   steps: 8
-  bpm: 120
+  bpm: 90.0
   swing: 0.09
-  density: .65                # Note density (0.0-1.0)
-  root_note: 60               # MIDI note number for scale root (C4 = 60, C# = 61, D = 62, etc.)
-  gate_length: 1              # Note duration as fraction of step duration (0.1-1.0)
+  density: 0.01
+  root_note: 52
+  gate_length: 0.1
   quantize_scale_changes: bar
-  step_pattern: syncopated        # syncopated | four_on_the_floor | all_on
-  direction_pattern: song  # forward | backward | ping_pong | random | fugue | song
-  voices: 3                   # Number of voices for fugue mode (1-4, where 1 = monophonic)
-  note_division: quarter      # Note value per step: whole | half | quarter | eighth | sixteenth
-
-
+  step_pattern: syncopated
+  direction_pattern: song
+  voices: 4
+  note_division: quarter
 scales:
-  - major
-  - minor
-  - blues
-  - pentatonic_major
-  - pentatonic_minor
-  - mixolydian
-  - dorian
-  - locrian
-
+- major
+- minor
+- blues
+- pentatonic_major
+- pentatonic_minor
+- mixolydian
+- dorian
+- locrian
 mutation:
-  interval_min_s: 30
-  interval_max_s: 60
+  interval_min_s: 10
+  interval_max_s: 15
   max_changes_per_cycle: 3
-  
-  # NTS-1 Plugin Configuration (auto-loaded when korg_nts1_mk2 profile is active)
-  nts1_plugin:
-    style: "ambient"              # Options: "default", "ambient", "rhythmic"
-    replace_default_rules: true   # Replace built-in rules with NTS-1 specific ones
-
 idle:
   timeout_ms: 300000
-  ambient_profile: meditative # slow_fade | meditative | rhythmic
+  ambient_profile: meditative
   fade_in_ms: 10000
   fade_out_ms: 1000
   smooth_bpm_transitions: true
-  bpm_transition_duration_s: 30
-
-# API Configuration for dynamic configuration management
+  bpm_transition_duration_s: 30.0
+synth:
+  backend: supercollider
+  voices: 8
+logging:
+  level: DEBUG
 api:
   enabled: true
   port: 8080
-  host: "0.0.0.0"
-  log_level: "info"
+  host: 0.0.0.0
+  log_level: info
+cc_profiles: {}
