@@ -1,3 +1,19 @@
+## 0.3.2 (2026-10-31)
+
+### Fix
+
+- address timing error
+
+## 0.3.1 (2026-10-31)
+
+### Fix
+
+- resolve bugs in the sequencer engine
+
+### Refactor
+
+- various improvements to generator
+
 ## 0.3.0 (2026-10-31)
 
 ### Feat

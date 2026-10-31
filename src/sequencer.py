@@ -14,6 +14,7 @@ import random
 from state import State, StateChange
 from scale_mapper import ScaleMapper
 from fugue import FugueSequencer
+from musical_time import step_beats
 from song import SongSequencer
 from note_utils import format_note_with_number, format_rest
 
@@ -26,6 +27,7 @@ class TickEvent:
     step: int  # 0-based step number
     timestamp: float
     swing_adjusted: bool = False
+    scheduled_timestamp: Optional[float] = None  # Diagnostic clock deadline
 
 
 @dataclass
@@ -44,7 +46,7 @@ class HighResClock:
     Provides accurate timing for sequencer steps with swing support.
     """
     
-    def __init__(self, bpm: float = 110.0, ppq: int = 24, swing: float = 0.0):
+    def __init__(self, bpm: float = 110.0, ppq: int = 24, swing: float = 0.0, spin_seconds: float = 0.0005):
         self.bpm = bpm
         self.ppq = ppq  # Pulses per quarter note
         self.swing = swing
@@ -54,6 +56,7 @@ class HighResClock:
         self._start_time = 0.0
         self._tick_count = 0
         self._drift_accumulator = 0.0
+        self.spin_seconds = min(.0005, max(0.0, spin_seconds))
     
     def set_tick_callback(self, callback: Callable[[TickEvent], None]):
         """Set the callback for tick events."""
@@ -92,7 +95,7 @@ class HighResClock:
         log.debug(f"clock_params_updated bpm={self.bpm} swing={self.swing}")
     
     def _clock_thread(self):
-        """Main clock thread with drift correction."""
+        """Wait on absolute deadlines with a bounded final spin and no catch-up burst."""
         next_tick_time = self._start_time
         
         while self._running:
@@ -113,34 +116,30 @@ class HighResClock:
                     target_time += swing_offset
                     swing_adjusted = True
             
-            # Add accumulated drift compensation
-            target_time += self._drift_accumulator
-            
-            # Sleep until target time
-            current_time = time.perf_counter()
-            sleep_time = target_time - current_time
-            
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-            else:
-                # We're behind - accumulate the drift
-                self._drift_accumulator += sleep_time
-                # Limit drift accumulation to prevent runaway
-                self._drift_accumulator = max(-0.01, min(0.01, self._drift_accumulator))
-                
-                # If we're consistently behind, reset timing to prevent spiral
-                if sleep_time < -0.1:  # More than 100ms behind
-                    log.warning(f"Clock timing reset due to drift (behind by {-sleep_time:.3f}s)")
-                    next_tick_time = current_time
-                    self._drift_accumulator = 0.0
-            
+            # Absolute deadlines prevent previous scheduler delays becoming tempo drift.
+            remaining = target_time - time.perf_counter()
+            while self._running and remaining > self.spin_seconds:
+                # Short sleeps reduce host timer coalescing without extending spinning.
+                delay = remaining - self.spin_seconds
+                time.sleep(min(delay, .001) if self.spin_seconds else delay)
+                remaining = target_time - time.perf_counter()
+            while self._running and time.perf_counter() < target_time:
+                pass  # At most the configured final 0.5 ms; no priority escalation.
+            if not self._running:
+                break
+            actual_time = time.perf_counter()
+            if actual_time - target_time > tick_interval:
+                # Preserve musical tick count, but do not burst missed clock callbacks.
+                next_tick_time = actual_time
+
             # Emit tick event
             if self._tick_callback:
                 actual_time = time.perf_counter()
                 tick_event = TickEvent(
                     step=self._tick_count % self.ppq,
                     timestamp=actual_time,
-                    swing_adjusted=swing_adjusted
+                    swing_adjusted=swing_adjusted,
+                    scheduled_timestamp=target_time
                 )
                 try:
                     self._tick_callback(tick_event)
@@ -164,9 +163,12 @@ class Sequencer:
         self.clock = HighResClock()
         self._note_callback: Optional[Callable[[NoteEvent], None]] = None
         self._current_step = 0
-        self._steps_per_beat = 4  # Default to 16th notes, will be updated from state
         self._ticks_per_step = 0
         self._tick_counter = 0
+        self._transport_ticks = 0
+        self._started_once = False
+        self._running = False
+        self._active_division = self.state.get("note_division", "sixteenth")
         
         # Direction pattern state
         self._direction = 1  # 1 for forward, -1 for backward
@@ -183,11 +185,11 @@ class Sequencer:
         self._bpm_transition_start_bpm = 0.0
         self._bpm_transition_target_bpm = 0.0
 
-        # Fugue sequencer (lazy initialized)
-        self._fugue_sequencer: Optional[FugueSequencer] = None
+        # Playback object is cheap; its worker starts with the engine lifecycle.
+        self._fugue_sequencer: FugueSequencer = FugueSequencer(state, self.scale_mapper)
 
-        # Song sequencer (lazy initialized)  
-        self._song_sequencer: Optional[SongSequencer] = None
+        # Song playback is cheap; its preparation worker starts with the engine.
+        self._song_sequencer: Optional[SongSequencer] = SongSequencer(state, self.scale_mapper)
 
         # Listen for state changes
         self.state.add_listener(self._on_state_change)
@@ -200,53 +202,6 @@ class Sequencer:
         self.clock.set_tick_callback(self._on_tick)
         
         log.info("sequencer_initialized")
-    
-    def _get_steps_per_beat_from_division(self, note_division: str) -> int:
-        """Calculate steps per beat based on note division.
-        
-        Args:
-            note_division: Note division ('whole', 'half', 'quarter', 'eighth', 'sixteenth')
-            
-        Returns:
-            Number of steps per quarter note beat
-        """
-        division_map = {
-            'whole': 0.25,      # 1 whole note = 4 quarter notes, so 0.25 steps per quarter
-            'half': 0.5,        # 1 half note = 2 quarter notes, so 0.5 steps per quarter  
-            'quarter': 1,       # 1 quarter note = 1 quarter note, so 1 step per quarter
-            'eighth': 2,        # 2 eighth notes = 1 quarter note, so 2 steps per quarter
-            'sixteenth': 4      # 4 sixteenth notes = 1 quarter note, so 4 steps per quarter
-        }
-        
-        steps_per_beat = division_map.get(note_division, 4)  # Default to sixteenth notes
-        
-        # For whole and half notes, we need to adjust the calculation since we can't have
-        # fractional steps. Instead, we'll slow down the effective step rate.
-        if note_division == 'whole':
-            return 1  # 1 step per 4 quarter notes (handled in timing calculation)
-        elif note_division == 'half':
-            return 1  # 1 step per 2 quarter notes (handled in timing calculation)
-        else:
-            return int(steps_per_beat)
-    
-    def _get_beat_multiplier_from_division(self, note_division: str) -> float:
-        """Get beat multiplier for whole and half note divisions.
-        
-        Args:
-            note_division: Note division string
-            
-        Returns:
-            Multiplier for beat timing (1.0 for normal timing)
-        """
-        multiplier_map = {
-            'whole': 4.0,       # Each step lasts 4 quarter notes
-            'half': 2.0,        # Each step lasts 2 quarter notes
-            'quarter': 1.0,     # Each step lasts 1 quarter note
-            'eighth': 1.0,      # Normal timing (handled by steps_per_beat)
-            'sixteenth': 1.0    # Normal timing (handled by steps_per_beat)
-        }
-        
-        return multiplier_map.get(note_division, 1.0)
     
     def set_step_probabilities(self, probabilities: List[float]):
         """Set per-step probability array.
@@ -345,6 +300,7 @@ class Sequencer:
         
         # Set BPM directly in state
         self.state.set('bpm', bpm, source='sequencer_immediate')
+        self.clock.update_params(bpm=bpm)
         log.debug(f"bpm_set_immediate bpm={bpm:.1f}")
     
     def _update_bpm_transition(self):
@@ -362,6 +318,7 @@ class Sequencer:
             
             # Set final BPM value
             self.state.set('bpm', final_bpm, source='sequencer_transition_complete')
+            self.clock.update_params(bpm=final_bpm)
             log.info(f"bpm_transition_complete final_bpm={final_bpm:.1f}")
             
         else:
@@ -393,17 +350,8 @@ class Sequencer:
         Returns:
             List of boolean values for the pattern
         """
-        presets = {
-            'four_on_floor': [True, False, False, False, True, False, False, False],
-            'offbeat': [False, True, False, True, False, True, False, True],
-            'every_other': [True, False, True, False, True, False, True, False],
-            'syncopated': [True, False, True, True, False, True, False, False],
-            'dense': [True, True, False, True, True, False, True, True],
-            'sparse': [True, False, False, False, False, False, True, False],
-            'all_on': [True] * 8,
-            'all_off': [False] * 8
-        }
-        
+        from rhythm import PATTERNS
+        presets = PATTERNS
         if preset_name in presets:
             return presets[preset_name]
         else:
@@ -550,40 +498,37 @@ class Sequencer:
         self._note_callback = callback
     
     def start(self):
-        """Start the sequencer."""
-        # Generate note for the initial step (step 0)
-        self._generate_step_note(self._current_step)
-        
+        """Start preparation and the clock; emit position zero only on the first start."""
+        if self._running:
+            return
+        self._running = True
+        self._fugue_sequencer.start_preparation()
+        self._song_sequencer.start_preparation()
+        if not self._started_once:
+            self._started_once = True
+            self._generate_step_note(self._current_step)
         self.clock.start()
         log.info("sequencer_started")
-    
+
     def stop(self):
-        """Stop the sequencer."""
+        """Stop playback and join background preparation outside the timing callback."""
         self.clock.stop()
+        self._running = False
+        self._fugue_sequencer.stop_preparation()
+        self._song_sequencer.stop_preparation()
         log.info("sequencer_stopped")
-    
+
     def _update_clock_from_state(self):
-        """Update clock parameters from current state."""
-        bpm = self.state.get('bpm', 110.0)
-        swing = self.state.get('swing', 0.0)
-        note_division = self.state.get('note_division', 'sixteenth')
-        
-        # Update steps per beat based on note division
-        self._steps_per_beat = self._get_steps_per_beat_from_division(note_division)
-        
-        # Apply beat multiplier for whole and half notes
-        beat_multiplier = self._get_beat_multiplier_from_division(note_division)
-        effective_bpm = bpm / beat_multiplier
-        
-        self._ticks_per_step = self.clock.ppq // self._steps_per_beat
-        
-        # Ensure we have at least 1 tick per step
-        if self._ticks_per_step < 1:
-            self._ticks_per_step = 1
-        
-        self.clock.update_params(bpm=effective_bpm, swing=swing)
-        
-        log.debug(f"clock_timing_updated note_division={note_division} steps_per_beat={self._steps_per_beat} effective_bpm={effective_bpm:.1f} ticks_per_step={self._ticks_per_step}")
+        """Keep the clock at real BPM; defer division edits until a step boundary."""
+        self.clock.update_params(bpm=self.state.get('bpm', 110.0),
+                                 swing=self.state.get('swing', 0.0))
+        if not self._started_once and self._tick_counter == 0:
+            self._activate_division()
+
+    def _activate_division(self) -> None:
+        """Latch the requested division for the upcoming pattern step interval."""
+        self._active_division = self.state.get('note_division', 'sixteenth')
+        self._ticks_per_step = round(self.clock.ppq * step_beats(self._active_division))
 
     def _update_scale_from_state(self, force: bool = False):
         """Update the scale mapper from the current state."""
@@ -611,9 +556,12 @@ class Sequencer:
         else:
             log.warning(f"Invalid scale_index {scale_index}, max is {len(self.available_scales)-1}")
         self._pending_scale_index = None
+        self._fugue_sequencer.invalidate_preparation()
 
     def _on_state_change(self, change: StateChange):
-        """Handle state parameter changes."""
+        """Handle controls and invalidate prepared material after composition changes."""
+        if change.parameter in ("direction_pattern", "voices", "density", "root_note", "scale_index", "scale_mode"):
+            self._fugue_sequencer.invalidate_preparation()
         if change.parameter == 'bpm':
             # Handle BPM changes based on source
             if change.source == 'idle' and self.state.get('smooth_idle_transitions', True):
@@ -647,10 +595,6 @@ class Sequencer:
             elif direction == 'ping_pong':
                 self._direction = 1
                 self._ping_pong_direction = 1
-            elif direction == 'fugue':
-                # Initialize fugue sequencer if needed
-                if self._fugue_sequencer is None:
-                    self._fugue_sequencer = FugueSequencer(self.state, self.scale_mapper)
             elif direction == 'song':
                 # Initialize song sequencer if needed
                 if self._song_sequencer is None:
@@ -658,16 +602,24 @@ class Sequencer:
             log.debug(f"direction_pattern_changed pattern={direction}")
     
     def _on_tick(self, tick: TickEvent):
-        """Handle clock tick events."""
-        # Update BPM transition if active
+        """Advance absolute musical time, then dispatch bar, score, and pattern events."""
         self._update_bpm_transition()
-        
+        self._transport_ticks += 1
+        beat = self._transport_ticks / self.clock.ppq
+        if self._transport_ticks % (4 * self.clock.ppq) == 0:
+            if self._pending_scale_index is not None:
+                self._apply_scale_change(self._pending_scale_index)
+        mode = self.state.get('direction_pattern', 'forward')
+        if mode == 'song' and self._song_sequencer is not None:
+            self._song_sequencer.update_transport(beat)
         self._tick_counter += 1
-        
         if self._tick_counter >= self._ticks_per_step:
             self._tick_counter = 0
+            self._activate_division()
             self._advance_step()
-    
+        elif mode == 'fugue':
+            self._generate_step_note(self._current_step)
+
     def _advance_step(self):
         """Advance to the next step using the current direction pattern and generate events."""
         sequence_length = self.state.get('sequence_length', 8)
@@ -675,11 +627,6 @@ class Sequencer:
         # Calculate next step using direction pattern
         next_step = self._get_next_step(self._current_step, sequence_length)
         self._current_step = next_step
-        
-        # Bar boundary check for quantized changes (check if we're at step 0)
-        is_bar_boundary = self._current_step == 0
-        if is_bar_boundary and self._pending_scale_index is not None:
-            self._apply_scale_change(self._pending_scale_index)
         
         self.state.set('step_position', self._current_step, source='sequencer')
         
@@ -713,7 +660,9 @@ class Sequencer:
             
             # Song mode manages its own timing, density, and musical structure
             # It ignores standard probability controls similar to fugue mode
-            song_notes = self._song_sequencer.get_next_step_notes(step)
+            song_notes = self._song_sequencer.get_next_step_notes(
+                step, self._transport_ticks / self.clock.ppq,
+                step_beats(self._active_division), self.clock.bpm)
             for note_data in song_notes:
                 note, velocity, duration = note_data
                 note_event = NoteEvent(
@@ -736,9 +685,6 @@ class Sequencer:
 
         # Check if we're in fugue mode - completely bypass probability controls
         if direction_pattern == 'fugue':
-            if self._fugue_sequencer is None:
-                self._fugue_sequencer = FugueSequencer(self.state, self.scale_mapper)
-            
             # Fugue mode ignores all standard probability controls:
             # - density parameter (used only for fugue-specific parameters like stretto)
             # - step_probabilities array
@@ -748,7 +694,8 @@ class Sequencer:
             # The fugue engine has complete control over note generation timing
             # and uses its own musical logic for when notes should play.
             
-            fugue_notes = self._fugue_sequencer.get_next_step_notes(step)
+            fugue_notes = self._fugue_sequencer.get_next_step_notes(
+                step, self._transport_ticks / self.clock.ppq, self.clock.bpm)
             for note_data in fugue_notes:
                 note, velocity, duration = note_data
                 note_event = NoteEvent(
@@ -809,31 +756,31 @@ class Sequencer:
                 degree += sum(1 for active in step_pattern[:position] if active)
             note = self.scale_mapper.get_note(degree, octave=0)
             
-            # Phase 5.5: Velocity variation based on probability values
+            # Metrical accents and expression are independent of occurrence probability.
             base_velocity = self.state.get('base_velocity', 80)
             velocity_range = self.state.get('velocity_range', 40)  # +/- range
             
-            # Scale velocity based on step probability (higher prob = higher velocity)
-            # Also add some randomness based on the probability
-            velocity_factor = 0.5 + (step_prob * 0.5)  # 0.5 to 1.0 range
-            velocity_random = random.uniform(-0.2, 0.2) * step_prob  # More randomness for higher probs
+            # Accent the elapsed downbeat.
+            # Add bounded expression variation.
+            velocity_factor = 0.8 if (self._transport_ticks / self.clock.ppq) % 4 == 0 else 0.5  # 0.5 to 1.0 range
+            velocity_random = random.uniform(-0.2, 0.2)  # Independent of occurrence
             
             final_velocity_factor = max(0.1, min(1.0, velocity_factor + velocity_random))
             velocity = int(base_velocity + (velocity_range * (final_velocity_factor - 0.5)))
             velocity = max(1, min(127, velocity))  # Clamp to MIDI range
             
-            # Gate length variation based on probability values (similar to velocity)
-            bpm = self.state.get('bpm', 110.0)
-            step_duration = 60.0 / (bpm * self._steps_per_beat)
+            # Articulation varies independently of occurrence.
+            bpm = self.clock.bpm
+            step_duration = 60.0 * step_beats(self._active_division) / bpm
             
             # Use configurable gate length parameters with variation
             base_gate_length = self.state.get('base_gate_length', 0.8)
             gate_length_range = self.state.get('gate_length_range', 0.3)  # +/- range
             
-            # Scale gate length based on step probability (higher prob = longer gate)
-            # Also add some randomness based on the probability
-            gate_factor = 0.5 + (step_prob * 0.5)  # 0.5 to 1.0 range
-            gate_random = random.uniform(-0.15, 0.15) * step_prob  # Subtle randomness for higher probs
+            # Keep the configured gate as the center of variation.
+            # Add bounded expression variation.
+            gate_factor = 0.5  # Centered on the configured gate
+            gate_random = random.uniform(-0.15, 0.15)  # Bounded articulation variation
             
             final_gate_factor = max(0.1, min(1.0, gate_factor + gate_random))
             gate_length_factor = base_gate_length + (gate_length_range * (final_gate_factor - 0.5))

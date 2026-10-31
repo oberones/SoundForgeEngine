@@ -48,16 +48,16 @@ mapping:
     '61': filter_type
     '62': mod_type
 sequencer:
-  steps: 8
+  steps: 8 
   bpm: 90.0
   swing: 0.09
   density: 0.01
   root_note: 52
   gate_length: 0.1
   quantize_scale_changes: bar
-  step_pattern: syncopated
-  direction_pattern: song
-  voices: 4
+  step_pattern: forward 
+  direction_pattern: song 
+  voices: 3 
   note_division: quarter
 scales:
 - major

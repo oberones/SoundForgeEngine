@@ -179,9 +179,10 @@ def test_quantized_scale_change():
     assert sequencer._pending_scale_index == 1
     assert sequencer.scale_mapper.current_scale_name == "major" # Still major
 
-    # Advance to the next bar (step 0)
-    sequencer._current_step = sequencer.state.get('sequence_length') - 1
-    sequencer._advance_step() # This will wrap around to step 0
+    # A pattern wrap is not a musical bar; advance four elapsed quarter notes.
+    from sequencer import TickEvent
+    for _ in range(4 * sequencer.clock.ppq):
+        sequencer._on_tick(TickEvent(0, 0.0))
 
     # The scale change should have been applied
     assert sequencer._pending_scale_index is None

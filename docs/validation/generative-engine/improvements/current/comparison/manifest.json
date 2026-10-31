@@ -1,0 +1,321 @@
+{
+  "method": "Seeded per-bar thinning to common onset count; mean velocity normalized to 80. Diagnostic variants only.",
+  "seed": 1729,
+  "files": [
+    {
+      "name": "verse_chorus",
+      "version": "baseline",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 528,
+        "end_beat": 319.4,
+        "mean_velocity": 80.01136363636364,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      }
+    },
+    {
+      "name": "verse_chorus",
+      "version": "current",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "7": 51,
+          "3": 25,
+          "4": 58,
+          "0": 243,
+          "5": 76,
+          "1": 3,
+          "2": 68,
+          "9": 1
+        },
+        "notes": 528,
+        "end_beat": 319.6,
+        "mean_velocity": 79.95454545454545,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 0
+      }
+    },
+    {
+      "name": "aaba",
+      "version": "baseline",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 245,
+        "end_beat": 158.9,
+        "mean_velocity": 79.99591836734695,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      }
+    },
+    {
+      "name": "aaba",
+      "version": "current",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "7": 27,
+          "3": 19,
+          "4": 17,
+          "0": 108,
+          "5": 31,
+          "1": 5,
+          "2": 33,
+          "9": 1,
+          "11": 1
+        },
+        "notes": 245,
+        "end_beat": 159.2,
+        "mean_velocity": 79.80408163265307,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 0
+      }
+    },
+    {
+      "name": "verse_chorus_bridge",
+      "version": "baseline",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 725,
+        "end_beat": 431.4,
+        "mean_velocity": 80.0855172413793,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      }
+    },
+    {
+      "name": "verse_chorus_bridge",
+      "version": "current",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "7": 60,
+          "3": 32,
+          "4": 76,
+          "0": 355,
+          "5": 97,
+          "1": 4,
+          "2": 93,
+          "9": 4,
+          "11": 1
+        },
+        "notes": 725,
+        "end_beat": 431.2,
+        "mean_velocity": 80.02620689655173,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 0
+      }
+    },
+    {
+      "name": "blues_twelve_bar",
+      "version": "baseline",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 347,
+        "end_beat": 223.9,
+        "mean_velocity": 79.97694524495677,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      }
+    },
+    {
+      "name": "blues_twelve_bar",
+      "version": "current",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "7": 48,
+          "3": 25,
+          "4": 34,
+          "0": 129,
+          "1": 24,
+          "5": 45,
+          "2": 27,
+          "10": 6,
+          "8": 1,
+          "6": 5
+        },
+        "notes": 347,
+        "end_beat": 223.2,
+        "mean_velocity": 79.97982708933718,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 72
+      }
+    },
+    {
+      "name": "pop_standard",
+      "version": "baseline",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 818,
+        "end_beat": 479.4,
+        "mean_velocity": 80.09290953545232,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      }
+    },
+    {
+      "name": "pop_standard",
+      "version": "current",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "7": 70,
+          "3": 35,
+          "4": 91,
+          "0": 394,
+          "5": 114,
+          "1": 4,
+          "2": 100,
+          "9": 6,
+          "11": 1
+        },
+        "notes": 818,
+        "end_beat": 479.2,
+        "mean_velocity": 79.97066014669926,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 0
+      }
+    },
+    {
+      "name": "minimalist",
+      "version": "baseline",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 522,
+        "end_beat": 447.9,
+        "mean_velocity": 79.93486590038314,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      }
+    },
+    {
+      "name": "minimalist",
+      "version": "current",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "0": 411,
+          "4": 66,
+          "7": 31,
+          "3": 11
+        },
+        "notes": 522,
+        "end_beat": 447.2,
+        "mean_velocity": 79.98659003831418,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 0
+      }
+    },
+    {
+      "name": "fugue-3",
+      "version": "baseline",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "2": 63,
+          "11": 21,
+          "9": 13,
+          "14": 13,
+          "3": 12,
+          "1": 33,
+          "6": 3,
+          "10": 8,
+          "4": 13,
+          "12": 5,
+          "15": 5,
+          "0": 3,
+          "5": 4,
+          "13": 2,
+          "16": 1,
+          "8": 2,
+          "7": 2
+        },
+        "notes": 206,
+        "end_beat": 96.0,
+        "mean_velocity": 79.6747572815534,
+        "crossing_observations": 45,
+        "strong_beat_dissonance_observations": 21
+      }
+    },
+    {
+      "name": "fugue-3",
+      "version": "current",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "2": 56,
+          "11": 13,
+          "9": 13,
+          "3": 22,
+          "14": 8,
+          "12": 10,
+          "1": 30,
+          "15": 3,
+          "6": 3,
+          "0": 12,
+          "4": 9,
+          "5": 15,
+          "8": 3,
+          "10": 4,
+          "7": 2
+        },
+        "notes": 206,
+        "end_beat": 96.0,
+        "mean_velocity": 79.6747572815534,
+        "crossing_observations": 21,
+        "strong_beat_dissonance_observations": 16
+      }
+    },
+    {
+      "name": "fugue-4",
+      "version": "baseline",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "2": 58,
+          "11": 24,
+          "9": 12,
+          "14": 16,
+          "3": 14,
+          "1": 32,
+          "13": 4,
+          "10": 12,
+          "6": 3,
+          "4": 11,
+          "12": 4,
+          "15": 5,
+          "0": 3,
+          "5": 4,
+          "16": 2,
+          "8": 2,
+          "7": 3
+        },
+        "notes": 213,
+        "end_beat": 100.0,
+        "mean_velocity": 79.61971830985915,
+        "crossing_observations": 43,
+        "strong_beat_dissonance_observations": 21
+      }
+    },
+    {
+      "name": "fugue-4",
+      "version": "current",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "2": 54,
+          "11": 12,
+          "9": 15,
+          "3": 21,
+          "14": 9,
+          "12": 12,
+          "1": 27,
+          "15": 8,
+          "10": 7,
+          "6": 3,
+          "0": 14,
+          "4": 6,
+          "5": 15,
+          "8": 3,
+          "7": 3
+        },
+        "notes": 213,
+        "end_beat": 100.0,
+        "mean_velocity": 79.61971830985915,
+        "crossing_observations": 16,
+        "strong_beat_dissonance_observations": 17
+      }
+    }
+  ]
+}

@@ -1,0 +1,150 @@
+{
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "python": "3.14.6 (main, Jun 10 2026, 10:03:53) [Clang 21.0.0 (clang-2100.0.123.102)]",
+  "results": [
+    {
+      "mode": "fugue",
+      "spin_seconds": 0.0005,
+      "parent_cpu_percent": 3.5201527525530323,
+      "midi_queue_max_ms": 0.2902079140767455,
+      "midi_dropped": 0,
+      "voices": 3,
+      "bpm": 200.0,
+      "ppq": 24,
+      "swing": 0.0,
+      "generation": true,
+      "seconds": 12.0,
+      "handoffs": 9,
+      "callback": {
+        "count": 961,
+        "p50_ms": 0.011417083442211151,
+        "p95_ms": 0.04483293741941452,
+        "p99_ms": 0.14520809054374695,
+        "max_ms": 0.35295903217047453
+      },
+      "deadline_error": {
+        "count": 961,
+        "p50_ms": 1.3732202351093292,
+        "p95_ms": 2.4380837567150593,
+        "p99_ms": 2.5142020313069224,
+        "max_ms": 4.196629393845797
+      },
+      "button_dispatch": {
+        "count": 514,
+        "p50_ms": 0.04416704177856445,
+        "p95_ms": 0.12812495697289705,
+        "p99_ms": 0.1990839373320341,
+        "max_ms": 1.405916060321033
+      },
+      "budgets_met": false
+    },
+    {
+      "mode": "fugue",
+      "spin_seconds": 0.0005,
+      "parent_cpu_percent": 2.792674168975477,
+      "midi_queue_max_ms": 0.4978330107405782,
+      "midi_dropped": 0,
+      "voices": 4,
+      "bpm": 200.0,
+      "ppq": 24,
+      "swing": 0.0,
+      "generation": true,
+      "seconds": 12.0,
+      "handoffs": 9,
+      "callback": {
+        "count": 960,
+        "p50_ms": 0.007207971066236496,
+        "p95_ms": 0.038207974284887314,
+        "p99_ms": 0.13295805547386408,
+        "max_ms": 1.2092080432921648
+      },
+      "deadline_error": {
+        "count": 960,
+        "p50_ms": 1.3970008585602045,
+        "p95_ms": 2.4911442305892706,
+        "p99_ms": 2.5143653620034456,
+        "max_ms": 3.3991417149081826
+      },
+      "button_dispatch": {
+        "count": 516,
+        "p50_ms": 0.033207936212420464,
+        "p95_ms": 0.10291696526110172,
+        "p99_ms": 0.16245897859334946,
+        "max_ms": 0.4269171040505171
+      },
+      "budgets_met": false
+    },
+    {
+      "mode": "song",
+      "spin_seconds": 0.0005,
+      "parent_cpu_percent": 5.984005032824858,
+      "midi_queue_max_ms": 1.7580839339643717,
+      "midi_dropped": 0,
+      "voices": 3,
+      "bpm": 200.0,
+      "ppq": 24,
+      "swing": 0.0,
+      "generation": true,
+      "seconds": 12.0,
+      "handoffs": 13,
+      "callback": {
+        "count": 961,
+        "p50_ms": 0.01683307345956564,
+        "p95_ms": 0.07166701834648848,
+        "p99_ms": 0.21550001110881567,
+        "max_ms": 0.37579191848635674
+      },
+      "deadline_error": {
+        "count": 961,
+        "p50_ms": 1.4479862293228507,
+        "p95_ms": 2.370537491515279,
+        "p99_ms": 3.3437879756093025,
+        "max_ms": 5.810087779536843
+      },
+      "button_dispatch": {
+        "count": 511,
+        "p50_ms": 0.08533289656043053,
+        "p95_ms": 0.19608298316597939,
+        "p99_ms": 0.6006660405546427,
+        "max_ms": 1.0144170373678207
+      },
+      "budgets_met": false
+    },
+    {
+      "mode": "song",
+      "spin_seconds": 0.0005,
+      "parent_cpu_percent": 6.08968999067973,
+      "midi_queue_max_ms": 2.054792013950646,
+      "midi_dropped": 0,
+      "voices": 4,
+      "bpm": 200.0,
+      "ppq": 24,
+      "swing": 0.0,
+      "generation": true,
+      "seconds": 12.0,
+      "handoffs": 13,
+      "callback": {
+        "count": 958,
+        "p50_ms": 0.015208031982183456,
+        "p95_ms": 0.05258398596197367,
+        "p99_ms": 0.19516597967594862,
+        "max_ms": 0.4747499478980899
+      },
+      "deadline_error": {
+        "count": 958,
+        "p50_ms": 1.3018191093578935,
+        "p95_ms": 2.361855236813426,
+        "p99_ms": 2.59388261474669,
+        "max_ms": 13.198377680964768
+      },
+      "button_dispatch": {
+        "count": 512,
+        "p50_ms": 0.07120799273252487,
+        "p95_ms": 0.14491693582385778,
+        "p99_ms": 0.25533291045576334,
+        "max_ms": 0.376041978597641
+      },
+      "budgets_met": false
+    }
+  ]
+}

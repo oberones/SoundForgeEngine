@@ -3,7 +3,6 @@ import logging
 import argparse
 import threading
 from typing import Optional
-from dataclasses import dataclass
 from config import load_config
 from router import Router
 from midi_in import MidiInput
@@ -21,72 +20,7 @@ from note_utils import format_note_with_number, format_rest
 from api_server import create_api_server
 
 
-@dataclass
-class ScheduledNoteOff:
-    """Represents a scheduled note off event."""
-    note: int
-    channel: int
-    timestamp: float
-
-
-class NoteScheduler:
-    """Handles scheduling of note off events for proper MIDI note timing."""
-    
-    def __init__(self, midi_output):
-        self.midi_output = midi_output
-        self._scheduled_notes: list[ScheduledNoteOff] = []
-        self._lock = threading.Lock()
-        self._running = False
-        self._thread: Optional[threading.Thread] = None
-    
-    def start(self):
-        """Start the note scheduler thread."""
-        if self._running:
-            return
-        
-        self._running = True
-        self._thread = threading.Thread(target=self._scheduler_thread, daemon=True)
-        self._thread.start()
-    
-    def stop(self):
-        """Stop the note scheduler."""
-        self._running = False
-        if self._thread:
-            self._thread.join(timeout=1.0)
-    
-    def schedule_note_off(self, note: int, channel: int, delay: float):
-        """Schedule a note off event after the specified delay."""
-        timestamp = time.time() + delay
-        scheduled = ScheduledNoteOff(note, channel, timestamp)
-        
-        with self._lock:
-            self._scheduled_notes.append(scheduled)
-            # Keep list sorted by timestamp for efficiency
-            self._scheduled_notes.sort(key=lambda x: x.timestamp)
-    
-    def _scheduler_thread(self):
-        """Main scheduler thread that processes note off events."""
-        while self._running:
-            current_time = time.time()
-            notes_to_remove = []
-            
-            with self._lock:
-                # Process all notes that are due
-                for scheduled in self._scheduled_notes:
-                    if scheduled.timestamp <= current_time:
-                        # Send note off
-                        self.midi_output.send_note_off(scheduled.note, 0, scheduled.channel)
-                        notes_to_remove.append(scheduled)
-                    else:
-                        # List is sorted, so we can break here
-                        break
-                
-                # Remove processed notes
-                for note in notes_to_remove:
-                    self._scheduled_notes.remove(note)
-            
-            # Sleep for a short time to avoid busy waiting
-            time.sleep(0.001)  # 1ms resolution
+from note_scheduler import NoteScheduler
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
@@ -271,19 +205,11 @@ def main(argv: Optional[list[str]] = None):
     note_scheduler = NoteScheduler(midi_output)
     note_scheduler.start()    # Set up note callback for sequencer-generated notes
     def handle_note_event(note_event: NoteEvent):
-        # Format note information with both name and number
-        if note_event.note == -1:
-            note_info = format_rest()
-        else:
-            note_info = format_note_with_number(note_event.note)
-        
-        log.info(f"note_event note={note_info} velocity={note_event.velocity} step={note_event.step} duration={note_event.duration:.3f}")
-        
-        # Send directly via MIDI output (no latency optimizer)
+        """Queue generated attacks; the output worker owns retriggers and releases."""
         if midi_output and midi_output.is_connected and note_event.note != -1:
-            midi_output.send_note_on(note_event.note, note_event.velocity, cfg.midi.output_channel)
-            note_scheduler.schedule_note_off(note_event.note, cfg.midi.output_channel, note_event.duration)
-        
+            note_scheduler.schedule_note(note_event.note, note_event.velocity,
+                                         cfg.midi.output_channel, note_event.duration)
+
         # TODO Phase 4+: Send to synthesis backend
     
     sequencer.set_note_callback(handle_note_event)

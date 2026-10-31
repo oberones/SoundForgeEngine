@@ -8,7 +8,7 @@ import time
 import threading
 from unittest.mock import Mock, patch, MagicMock
 from midi_out import MidiOutput, NullMidiOutput, get_available_output_ports
-from main import NoteScheduler, ScheduledNoteOff
+from main import NoteScheduler
 from sequencer import NoteEvent
 
 
@@ -206,15 +206,13 @@ class TestNoteScheduler:
         scheduler = NoteScheduler(mock_output)
         scheduler.start()
         
-        # Schedule a note with long delay
-        scheduler.schedule_note_off(60, 1, 1.0)  # 1 second
-        
-        # Stop immediately
+        # Wait for the writer to own an attack, then require shutdown to release it.
+        attacked = threading.Event()
+        mock_output.send_note_on.side_effect = lambda *args: attacked.set()
+        scheduler.schedule_note(60, 80, 1, 1.0)
+        assert attacked.wait(1)
         scheduler.stop()
-        
-        # Should not send the note (scheduler stopped)
-        time.sleep(0.01)
-        mock_output.send_note_off.assert_not_called()
+        mock_output.send_note_off.assert_called_once_with(60, 0, 1)
 
 
 class TestPhase3Integration:
@@ -301,11 +299,8 @@ class TestPhase3Integration:
         
         # Simulate main.py note handling
         if mock_output.is_connected:
-            mock_output.send_note_on(note_event.note, note_event.velocity, 1)
-            scheduler.schedule_note_off(note_event.note, 1, note_event.duration)
+            scheduler.schedule_note(note_event.note, note_event.velocity, 1, note_event.duration)
         
-        # Verify note on was sent immediately
-        mock_output.send_note_on.assert_called_once_with(60, 100, 1)
         
         # Wait for note off
         time.sleep(0.12)  # Slightly longer than duration

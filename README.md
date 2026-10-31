@@ -241,6 +241,17 @@ mapping:
 | `sequencer.voices` | `1` to `4` | Voice count for multi-voice modes |
 | `sequencer.note_division` | `whole`, `half`, `quarter`, `eighth`, `sixteenth` | Step timing division |
 
+Pattern division controls standard and song steps and their gate lengths. Fugue
+mode follows its written score rhythm at the configured BPM, independently of
+pattern division. Live division changes take effect at the next pattern step;
+bar-quantized scale changes follow four elapsed beats regardless of sequence length.
+
+Songs resume after a five-second pause. Fugues prepare in the background and start
+at a bar boundary when ready, with a ten-second pause after a completed score.
+Preparation delays can extend silence; `fugue_preparation_waiting` identifies this
+condition in logs. See the [engine review and validation record](docs/GENERATIVE_ENGINE_REVIEW.md#implementation-update--2026-10-31)
+for the remaining local timing-budget limitation.
+
 ### Scales
 
 | Key | Values | Purpose |

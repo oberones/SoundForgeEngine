@@ -249,6 +249,16 @@ current_time = time.perf_counter()
 sleep_time = target_time - current_time
 ```
 
+The parent sequencer counts elapsed ticks independently of pattern traversal.
+At the default 24 PPQ, a bar is 96 ticks and pattern divisions span 6–96 ticks.
+Song section boundaries and quantized scale changes use elapsed musical time.
+Fugue playback consumes immutable onset groups every tick. A coordinator in
+`fugue_preparation.py` submits rendering to a spawned process and publishes one
+ready score; the timing thread never renders or waits on a future. Worker resources
+start and stop with the sequencer lifecycle. See the
+[review update](../GENERATIVE_ENGINE_REVIEW.md#implementation-update--2026-10-31)
+for handoff semantics, tests, and unresolved timing qualification.
+
 #### 6.2 Sequencer Pattern Engine
 
 **Features**:

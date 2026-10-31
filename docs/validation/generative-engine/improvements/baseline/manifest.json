@@ -1,0 +1,177 @@
+{
+  "revision": "f117892c12c3c44ca293928fd41fd26c841de7ad",
+  "seed": 1729,
+  "bpm": 120,
+  "scale": "major",
+  "root": 60,
+  "division": "eighth",
+  "files": [
+    {
+      "name": "verse_chorus",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 1402,
+        "end_beat": 319.4,
+        "mean_velocity": 76.29029957203994,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      },
+      "midi_sha256": "006699465d966ebe83fb20773337f8a2ee87a0408faef2371d2d5407414bda3b"
+    },
+    {
+      "name": "aaba",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 702,
+        "end_beat": 158.9,
+        "mean_velocity": 75.01709401709402,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      },
+      "midi_sha256": "6a60353847f6896240de9c403056565b1437480f19f3924745de5292897d9841"
+    },
+    {
+      "name": "verse_chorus_bridge",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 1993,
+        "end_beat": 431.9,
+        "mean_velocity": 78.68941294530858,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      },
+      "midi_sha256": "4f95814aa85dc1a1b50511b5cd88d310f9804d165ededa03a122d030ddf921d0"
+    },
+    {
+      "name": "blues_twelve_bar",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 1042,
+        "end_beat": 223.9,
+        "mean_velocity": 75.71113243761997,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      },
+      "midi_sha256": "efc5d80824e2d4aafce90e441169f0611193c163efd8ce9b050a9362667fc3e2"
+    },
+    {
+      "name": "pop_standard",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 2271,
+        "end_beat": 479.4,
+        "mean_velocity": 79.0885072655218,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      },
+      "midi_sha256": "0cc3d7e7da536e3f679da352af01c4bac6a836df729858f188505823f0a7027d"
+    },
+    {
+      "name": "minimalist",
+      "metrics": {
+        "melodic_interval_semitones": null,
+        "notes": 1257,
+        "end_beat": 447.9,
+        "mean_velocity": 70.63166268894193,
+        "crossing_observations": null,
+        "strong_beat_dissonance_observations": null
+      },
+      "midi_sha256": "10114d86a1447ee840302bbeb3287d815b7770052d889cb6f8dfa071893dcb7b"
+    },
+    {
+      "name": "fugue-3",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "11": 21,
+          "2": 63,
+          "9": 13,
+          "14": 13,
+          "3": 12,
+          "1": 33,
+          "6": 3,
+          "10": 8,
+          "4": 13,
+          "12": 5,
+          "15": 5,
+          "0": 3,
+          "5": 4,
+          "13": 2,
+          "16": 1,
+          "8": 2,
+          "7": 2
+        },
+        "notes": 206,
+        "end_beat": 96.0,
+        "mean_velocity": 90.95145631067962,
+        "crossing_observations": 47,
+        "strong_beat_dissonance_observations": 23
+      },
+      "midi_sha256": "b34a39721ce9b9aac4304b6b9a358d7c76ac94fc4333d7a02363306ec649dd1e"
+    },
+    {
+      "name": "fugue-4",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "11": 24,
+          "2": 58,
+          "9": 12,
+          "14": 16,
+          "3": 14,
+          "1": 32,
+          "13": 4,
+          "10": 12,
+          "6": 3,
+          "4": 11,
+          "12": 4,
+          "15": 5,
+          "0": 3,
+          "5": 4,
+          "16": 2,
+          "8": 2,
+          "7": 3
+        },
+        "notes": 213,
+        "end_beat": 100.0,
+        "mean_velocity": 90.89201877934272,
+        "crossing_observations": 45,
+        "strong_beat_dissonance_observations": 23
+      },
+      "midi_sha256": "aa12e3be855fa52b949744eff41312db0a5faeb50b6fb8d8b02cba552479292d"
+    }
+  ],
+  "evidence": "Offline events and MIDI; listening and physical MIDI not validated",
+  "source_sha256": {
+    "action_handler.py": "0e5398bc0789370001c7908017e1e3e44d990e1f96b11b2498a1c8cbd9ea4844",
+    "api_server.py": "7c5c98d2b131c7b0de37b72fda49689e0119915911b7ff9508876514db66319d",
+    "cc_profiles.py": "3a17f15193148dff5c0ed2e1af422061df202aa2b60a49cace43dd1dd84da0d5",
+    "config.py": "0f8ca46b57f780d2f0e2bffe884619841636b093a0e84867166b65670b2f8b75",
+    "events.py": "1b7299466129ba262f1ec234d2aa2889eb167cf2c34acf68b6ba1e5812c26979",
+    "external_hardware.py": "7f2ccabaa578db8f410f6d0a7bc6e8cd3c635eb341f09e71cdbe2c79324f10a0",
+    "fugue.py": "f78383545e73f81217a5579d31639130bebe632f0cba8e634ddb046d42766587",
+    "fugue_preparation.py": "13e4c847d981cafb58f65579ad3ae69cde44e4356a17f34c16a746a934069c04",
+    "hid_input.py": "364498be2d355fe052e057c460a0c77950539ddd7382d3f499f910e03db542fa",
+    "hidapi_input.py": "ede0c30eff7467f46657804ec79b46afdf15820cf96cac111af455e91611a234",
+    "hybrid_input.py": "049c0b360bd1f2988c417180d301dfab6860a30c90fbb3d2f7437ecbd2e6bd55",
+    "idle.py": "5d687fa8ccdf2b68945949d6682e3a68bf91ce06f6008af0295bd4070646aedb",
+    "latency_optimizer.py": "80b9966d6c6efcfda305af6ef6c52c16043d0a08ae117ff1d7011c5436bcb9f1",
+    "logging_utils.py": "053c22c94e2efb36462650f2f45d5c17d337a6410bd719dee7249d5659acdd3a",
+    "main.py": "54bf20506a179031fdd8233dfeed1682b90f2de7aa20191be69f644319607970",
+    "midi_clock.py": "02ca90d0951591d4cf7e0ce02b49c127cb0f660ce78f4ab354ae498a189b71fc",
+    "midi_in.py": "31f90c8c1f8882abb5068e4f2d5512797466fcab0c7bf2db0df53573096f791b",
+    "midi_out.py": "8f3457d2f127944ee77b3f6bc5b186693a4ac7b5e8c7c1c2407bb6515ef4e9ae",
+    "musical_time.py": "afcc9564e2108ff3c3e58e5803cc8bd59cd6eb23945cd29cea624b9808ff072c",
+    "mutation.py": "d331d5d427bcf6be2e754793802e74bcb6d2384e0f21c32512bdd90439ec5beb",
+    "note_utils.py": "67218d5cf8a27255e1ccd9cd8061111c1fcb8add0648aa17613f99cbfb79dca2",
+    "nts1_integration.py": "bb2802a21ccdc1ec8e8eadca166720c07964f382ed4e18685ef3cf732a6f0397",
+    "nts1_mutation_plugin.py": "9f02d6de07d62669c7c3bf8d5df91486e47372efd4417fb3bb0f4055dbacf0ef",
+    "router.py": "a253b7e6ea71ad8f1946e270073a41bc60441cf0c0f8bc1efe6ddd32fd6535e2",
+    "scale_mapper.py": "2aa0c238cdff1e98dd77f47b0127b4dece2399c722af0b745c8b9415371f582b",
+    "sequencer.py": "e0d27614f9d890527decaa6d344b962e4b2c5b4ba0dde9bf6a7ffb1fe867466b",
+    "song.py": "bb654e3d71101eda79ecfce7c0099f27a95a0d61f73841b09f5c9e27ef8248b9",
+    "state.py": "d27df7c1f6179762c838b1d3696f8da10f7884b14c62aa182a9be89bbc31fd12",
+    "ui_catalog.py": "b338f03844da37a5f8796bbc5c5de14363d3b95fd2ccd0f19760e3ed40494905",
+    "ui_persistence.py": "4ff0143d9b00a9878f725719456dbc931d30505852b057c76f41b0ebcc588c8d",
+    "ui_sessions.py": "55f0e8fb5583459c5167f4d3c278f3af289ec08186ca9752a2324d4a6e943cc3",
+    "ui_snapshot.py": "938216dff42b1b4886c0da50518ba55966b57be05058ce6f713093aa01f503e0"
+  }
+}
