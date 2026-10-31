@@ -5,7 +5,7 @@ with the configured number of voices, BPM, scale, and other sequencer settings.
 """
 
 from __future__ import annotations
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, NamedTuple
 from dataclasses import dataclass, replace
 from enum import Enum
 import time
@@ -20,6 +20,14 @@ from song_composition import SectionSpec, SongRequest, prepare_song
 from note_utils import format_note_with_number, format_rest
 
 log = logging.getLogger(__name__)
+
+
+class SongEvent(NamedTuple):
+    """Emitted attack with stable voice identity and playback duration in seconds."""
+    voice: int
+    pitch: int
+    velocity: int
+    duration: float
 
 
 class SectionType(Enum):
@@ -280,7 +288,18 @@ class SongSequencer:
     def get_next_step_notes(self, step: int, beat: Optional[float] = None,
                             beats_per_step: Optional[float] = None,
                             bpm: Optional[float] = None) -> List[Tuple[int, int, float]]:
-        """Emit a pattern step at an explicit beat; standalone calls advance elapsed time."""
+        """Emit playback triples using the same event consumption as identity-aware callers."""
+        return [(event.pitch, event.velocity, event.duration)
+                for event in self.get_next_step_events(step, beat, beats_per_step, bpm)]
+
+    def get_next_step_events(self, step: int, beat: Optional[float] = None,
+                             beats_per_step: Optional[float] = None,
+                             bpm: Optional[float] = None) -> List[SongEvent]:
+        """Consume a step with voice identities; standalone calls advance elapsed time.
+
+        This is an alternative to get_next_step_notes, not a second read of a step.
+        Both APIs advance the same transport and prepared-attack cursors.
+        """
         self._step_beats = (beats_per_step if beats_per_step is not None else
                             step_beats(self.state.get('note_division', 'sixteenth')))
         self._playback_bpm = bpm if bpm is not None else self.state.get('bpm', 120.0)
@@ -302,7 +321,7 @@ class SongSequencer:
             return []
         if self.state.get('bpm', 120.0) != previous_bpm:
             self._playback_bpm = self.state.get('bpm', 120.0)
-        return self._generate_section_notes(step)
+        return self._generate_section_events(step)
 
     def _check_section_advancement(self, beat: float) -> None:
         """Complete sections at their elapsed 4/4 boundaries, never at pattern wraps."""
@@ -336,13 +355,14 @@ class SongSequencer:
         
         log.info("song_between_songs_started duration=5.0s")
     
-    def _generate_section_notes(self, step: int) -> List[Tuple[int, int, float]]:
-        """Quantize crossed attacks to this step, keeping the latest per voice.
+    def _generate_section_events(self, step: int) -> List[SongEvent]:
+        """Quantize crossed attacks, retaining each emitted event's voice identity.
 
         Live division changes retain the parent's step phase, so callbacks need
         not land on prepared attacks. Consume rows through the current beat once,
-        including muted steps. Scan at most one whole-note interval (16 rows),
-        the longest supported division, to bound work even after a playback gap.
+        including muted steps, keeping the latest attack per voice. Scan at most
+        one whole-note interval (16 rows), the longest supported division, to bound
+        work even after a playback gap.
         """
         if self._material is None or self._current_pattern is None:
             return []
@@ -365,7 +385,7 @@ class SongSequencer:
                 voices[note.voice] = note
         bpm = getattr(self, '_playback_bpm', self.state.get('bpm', 120.0))
         remaining = section.bars * 4 - elapsed
-        return [(n.pitch, max(1, min(127, round(self._base_velocity * n.velocity))),
+        return [SongEvent(n.voice, n.pitch, max(1, min(127, round(self._base_velocity * n.velocity))),
                  min(remaining, n.duration or self._step_beats) * self._base_gate_length * 60.0 / bpm)
                 for _, n in sorted(voices.items())]
 

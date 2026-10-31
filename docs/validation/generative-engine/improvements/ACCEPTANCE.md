@@ -17,6 +17,8 @@ Each manifest includes hashes of its source files and exported MIDI.
   Dissonance observations include intentional blues sevenths and are not failure
   counts. Fugue tonal costs describe preparation/resolution; neither that cost
   nor fewer crossings proves better music.
+- Current exports retain the voice identity of each emitted attack, including
+  ornaments consumed from earlier quarter-beat rows at the playback step.
 - `timing-*.json`: sleep-only baseline, bounded-spin baseline, and generation load.
   `*-initial.json` preserves the long-sleep attempt before capped-sleep tuning.
   Deadline error includes every observed outlier. CPU is parent-process CPU only;

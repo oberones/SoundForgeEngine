@@ -71,7 +71,7 @@ def metrics(events):
 
 
 def main():
-    """Export all presets and three/four-voice fugues with provenance and settings."""
+    """Export presets and fugues with emitted voice identities, provenance and settings."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--seed', type=int, default=1729)
@@ -137,12 +137,17 @@ def main():
             state.set('bpm', args.bpm)
             for step in range(section.bars * 8):
                 beat = origin + step * .5
-                notes = song.get_next_step_notes(step % 8, beat=beat, beats_per_step=.5, bpm=args.bpm)
-                voices = [n.voice for n in material.sections[si][step * 2]] if current else []
-                for ni, (pitch, velocity, duration) in enumerate(notes):
+                if current:
+                    # Quantized attacks can come from earlier rows. Keep the voice
+                    # attached to the actual emitted event after per-voice selection.
+                    notes = song.get_next_step_events(step % 8, beat=beat, beats_per_step=.5, bpm=args.bpm)
+                else:
+                    notes = [(None, pitch, velocity, duration)
+                             for pitch, velocity, duration in song.get_next_step_notes(
+                                 step % 8, beat=beat, beats_per_step=.5, bpm=args.bpm)]
+                for voice, pitch, velocity, duration in notes:
                     events.append(dict(beat=beat, pitch=pitch, velocity=velocity,
-                                       duration=duration * args.bpm / 60,
-                                       voice=voices[ni] if current else None))
+                                       duration=duration * args.bpm / 60, voice=voice))
             origin += section.bars * 4
         save(name, events, metadata)
     for voices in (3, 4):

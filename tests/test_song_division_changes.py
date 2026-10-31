@@ -143,3 +143,42 @@ def test_forced_off_grid_section_does_not_emit_future_attacks(monkeypatch):
     assert [(t, e.note) for t, e in events] == [(0, 72), (6, 72)]
     tick(seq, 6)
     assert [(t, e.note) for t, e in events] == [(0, 72), (6, 72), (12, 74)]
+
+
+def test_song_events_preserve_consumed_voices_and_latest_attacks(monkeypatch):
+    """Identity follows crossed attacks, including voices absent from the current row."""
+    section = SongSection(SectionType.VERSE, 1, 1.0)
+    _, _, song, _ = prepared_sequencer(
+        monkeypatch, SongPattern('fixture', [section], 1))
+    install_rows(song, {
+        0: [SongNote(0, 72, 1, 0)],
+        1: [SongNote(0, 74, 1, 0), SongNote(2, 48, 1, 4)],
+        2: [SongNote(0, 76, 1, 0), SongNote(1, 60, 1, 2)],
+        3: [SongNote(2, 50, 1, 4)],
+    })
+    assert song.start_new_song()
+    assert [event.voice for event in song.get_next_step_events(0, beat=0)] == [0]
+    events = song.get_next_step_events(1, beat=.5, beats_per_step=.5, bpm=120)
+    assert [(event.voice, event.pitch) for event in events] == [(0, 76), (1, 60), (2, 48)]
+    assert [event.velocity for event in events] == [80, 80, 80]
+    assert [event.duration for event in events] == pytest.approx([.2, .8, 1.4])
+    events = song.get_next_step_events(2, beat=1, beats_per_step=.5, bpm=120)
+    assert [(event.voice, event.pitch) for event in events] == [(2, 50)]
+    assert song.get_next_step_events(3, beat=1.5, beats_per_step=.5) == []
+
+
+def test_song_events_discard_masked_attacks_and_keep_playback_tuple_api(monkeypatch):
+    """Muted steps consume their attacks; both APIs share the same emission cursor."""
+    section = SongSection(SectionType.VERSE, 1, 1.0, step_pattern='every_other')
+    _, _, song, _ = prepared_sequencer(
+        monkeypatch, SongPattern('fixture', [section], 1))
+    install_rows(song, {
+        0: [SongNote(2, 48, 1, 4)],
+        1: [SongNote(0, 72, 1, 0)],
+    })
+    assert song.start_new_song()
+    assert song.get_next_step_notes(0, beat=0, beats_per_step=.5) == [(48, 80, 1.6)]
+    assert song.get_next_step_events(1, beat=.5, beats_per_step=.5) == []
+    assert song.get_next_step_events(2, beat=1, beats_per_step=.5) == []
+    song._start_between_songs()
+    assert song.get_next_step_events(3, beat=1.5, beats_per_step=.5) == []
