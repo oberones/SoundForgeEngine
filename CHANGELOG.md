@@ -1,3 +1,13 @@
+## 0.3.0 (2026-10-31)
+
+### Feat
+
+- add an omni out for midi
+
+### Fix
+
+- resolve bug in sequencer pitch mapping
+
 ## 0.2.0 (2026-04-19)
 
 ### Feat
