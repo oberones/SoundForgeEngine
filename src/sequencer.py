@@ -692,7 +692,8 @@ class Sequencer:
         """
         Generate a note event for the given step.
         
-        Standard mode: Considers density and probability controls.
+        Standard mode: Considers density and probability controls, mapping active
+                       steps to consecutive degrees across rhythm pattern repeats.
         Fugue mode: Uses fugue sequencer for contrapuntal note generation,
                    completely bypassing normal probability controls.
         Song mode: Uses song sequencer for structured composition generation,
@@ -797,10 +798,15 @@ class Sequencer:
             is_active_step = step_pattern[step % pattern_length]
         
         if is_active_step and random.random() < step_prob:
-            # Use scale mapper to get the note
-            # 1:1 mapping: each step gets its own scale degree
-            sequence_length = self.state.get('sequence_length', 8)
-            degree = step % sequence_length
+            # Count active steps before this position across all pattern repeats.
+            # Density/probability gating does not shift subsequent scale degrees.
+            if step_pattern is None:
+                # Default even-step pattern: steps 0,2,4,6 -> degrees 0,1,2,3
+                degree = step // 2
+            else:
+                completed_patterns, position = divmod(step, pattern_length)
+                degree = completed_patterns * sum(1 for active in step_pattern if active)
+                degree += sum(1 for active in step_pattern[:position] if active)
             note = self.scale_mapper.get_note(degree, octave=0)
             
             # Phase 5.5: Velocity variation based on probability values
