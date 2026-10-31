@@ -13,6 +13,8 @@ from note_utils import format_note_with_number
 
 log = logging.getLogger(__name__)
 
+OMNI_CHANNEL = 0  # Channel value meaning "send on all 16 MIDI channels"
+
 
 class MidiMessageSender(Protocol):
     """Protocol for MIDI message sending."""
@@ -92,13 +94,28 @@ class MidiOutput:
         
         return False
     
+    def _resolve_channels(self, channel: Optional[int]) -> list[int]:
+        """Resolve the effective channel to a list of 0-based MIDI channels.
+        
+        A channel value of OMNI_CHANNEL (0) expands to all 16 channels.
+        """
+        effective = channel if channel is not None else self.channel
+        if effective == OMNI_CHANNEL:
+            return list(range(16))
+        return [effective - 1]  # Convert to 0-based
+    
+    @staticmethod
+    def _channel_label(channel: Optional[int], resolved: list[int]) -> str:
+        """Human-readable channel label for logging."""
+        return "all" if len(resolved) > 1 else str(resolved[0] + 1)
+    
     def send_note_on(self, note: int, velocity: int, channel: Optional[int] = None) -> bool:
         """Send a MIDI Note On message.
         
         Args:
             note: MIDI note number (0-127)
             velocity: Note velocity (1-127, 0 is treated as Note Off)
-            channel: MIDI channel (1-16), uses default if None
+            channel: MIDI channel (1-16) or 0 for all channels, uses default if None
             
         Returns:
             True if message was sent successfully, False otherwise
@@ -110,10 +127,11 @@ class MidiOutput:
             return self.send_note_off(note, 0, channel)
         
         try:
-            ch = (channel or self.channel) - 1  # Convert to 0-based
-            msg = mido.Message('note_on', channel=ch, note=note, velocity=velocity)
-            self.port.send(msg)
-            log.debug(f"Sent Note On: note={format_note_with_number(note)} velocity={velocity} channel={channel or self.channel}")
+            channels = self._resolve_channels(channel)
+            for ch in channels:
+                msg = mido.Message('note_on', channel=ch, note=note, velocity=velocity)
+                self.port.send(msg)
+            log.debug(f"Sent Note On: note={format_note_with_number(note)} velocity={velocity} channel={self._channel_label(channel, channels)}")
             return True
             
         except Exception as e:
@@ -127,7 +145,7 @@ class MidiOutput:
         Args:
             note: MIDI note number (0-127)
             velocity: Release velocity (0-127)
-            channel: MIDI channel (1-16), uses default if None
+            channel: MIDI channel (1-16) or 0 for all channels, uses default if None
             
         Returns:
             True if message was sent successfully, False otherwise
@@ -136,10 +154,11 @@ class MidiOutput:
             return False
         
         try:
-            ch = (channel or self.channel) - 1  # Convert to 0-based
-            msg = mido.Message('note_off', channel=ch, note=note, velocity=velocity)
-            self.port.send(msg)
-            log.debug(f"Sent Note Off: note={format_note_with_number(note)} velocity={velocity} channel={channel or self.channel}")
+            channels = self._resolve_channels(channel)
+            for ch in channels:
+                msg = mido.Message('note_off', channel=ch, note=note, velocity=velocity)
+                self.port.send(msg)
+            log.debug(f"Sent Note Off: note={format_note_with_number(note)} velocity={velocity} channel={self._channel_label(channel, channels)}")
             return True
             
         except Exception as e:
@@ -153,7 +172,7 @@ class MidiOutput:
         Args:
             control: Controller number (0-127)
             value: Controller value (0-127)
-            channel: MIDI channel (1-16), uses default if None
+            channel: MIDI channel (1-16) or 0 for all channels, uses default if None
             
         Returns:
             True if message was sent successfully, False otherwise
@@ -162,10 +181,11 @@ class MidiOutput:
             return False
         
         try:
-            ch = (channel or self.channel) - 1  # Convert to 0-based
-            msg = mido.Message('control_change', channel=ch, control=control, value=value)
-            self.port.send(msg)
-            log.debug(f"Sent CC: control={control} value={value} channel={channel or self.channel}")
+            channels = self._resolve_channels(channel)
+            for ch in channels:
+                msg = mido.Message('control_change', channel=ch, control=control, value=value)
+                self.port.send(msg)
+            log.debug(f"Sent CC: control={control} value={value} channel={self._channel_label(channel, channels)}")
             return True
             
         except Exception as e:
@@ -177,7 +197,7 @@ class MidiOutput:
         """Send All Notes Off control change message.
         
         Args:
-            channel: MIDI channel (1-16), uses default if None
+            channel: MIDI channel (1-16) or 0 for all channels, uses default if None
             
         Returns:
             True if message was sent successfully, False otherwise
@@ -209,7 +229,7 @@ class MidiOutput:
         
         Args:
             port_name: Name of MIDI port, "auto" for auto-selection, or None to disable
-            channel: Default MIDI channel (1-16)
+            channel: Default MIDI channel (1-16) or 0 for all channels
             
         Returns:
             MidiOutput instance if successful, None if disabled or failed

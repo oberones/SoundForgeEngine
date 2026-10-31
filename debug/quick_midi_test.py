@@ -57,7 +57,8 @@ def quick_test():
         print(f"   Input Port: {input_port}")
         print(f"   Input Channel: {input_channel}")
         print(f"   Output Port: {output_port}")
-        print(f"   Output Channel: {output_channel}")
+        output_channel_label = f"{output_channel} (all channels)" if output_channel == 0 else str(output_channel)
+        print(f"   Output Channel: {output_channel_label}")
         
     except Exception as e:
         print(f"   ⚠️  Could not load config: {e}")

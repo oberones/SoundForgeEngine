@@ -189,7 +189,7 @@ All supported configuration is defined in [src/config.py](src/config.py). The to
 | `midi.input_port` | Port name or `auto` | MIDI input source |
 | `midi.output_port` | Port name or `null` | External synth/output destination |
 | `midi.input_channel` | Integer channel | MIDI input channel filter |
-| `midi.output_channel` | Integer channel | MIDI output channel |
+| `midi.output_channel` | Integer `1`-`16`, or `0` | MIDI output channel (`0` = send on all channels) |
 | `midi.clock.enabled` | `true` / `false` | Enable MIDI clock output |
 | `midi.clock.send_start_stop` | `true` / `false` | Send transport start/stop |
 | `midi.clock.send_song_position` | `true` / `false` | Send song-position messages |

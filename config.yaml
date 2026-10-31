@@ -2,7 +2,7 @@ midi:
   input_port: auto
   output_port: RK006 OUT_ALL
   input_channel: 1
-  output_channel: 14
+  output_channel: 0 
   clock:
     enabled: true
     send_start_stop: true
