@@ -213,10 +213,14 @@ The fugue mode can be controlled via existing MIDI mappings:
 
 ## Performance Characteristics
 
-- **CPU Usage**: Moderate - fugue generation is done in batches
-- **Memory**: Low - voices stored as simple note lists
-- **Latency**: <10ms note generation (meets spec requirements)
-- **Determinism**: Reproducible fugues via seeded random generation
+- **CPU Usage**: Rendering and optimization run in one spawned worker process.
+- **Memory**: Lookahead is bounded to one ready score and one in-flight request.
+- **Playback**: Prepared score onsets run on clock ticks, independently of pattern division.
+- **Latency qualification**: Local callbacks are short, but the under-2-ms clock-jitter
+  gate remains open. The previous latency claim was not sufficient evidence; see
+  the [review validation update](../GENERATIVE_ENGINE_REVIEW.md#implementation-update--2026-10-31).
+- **Determinism**: The raw generator still supports seeded generation. RNG semantics
+  remain the separate F07 follow-up; worker isolation does not close that finding.
 
 ## Future Enhancements
 

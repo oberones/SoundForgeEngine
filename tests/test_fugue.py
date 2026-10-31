@@ -145,6 +145,13 @@ class TestFugueSequencer:
         self.scale_mapper = ScaleMapper()
         self.scale_mapper.set_scale("minor", root_note=60)
         self.fugue_sequencer = FugueSequencer(self.state, self.scale_mapper)
+        # Playback tests use a prepared score; generation is tested separately.
+        from fugue_preparation import compile_score
+        self.state.set('direction_pattern', 'fugue')
+        prepared = compile_score([[dict(pitch=60, vel=80, dur=1.0),
+                                   dict(pitch=62, vel=80, dur=1.0)]])
+        self.fugue_sequencer.preparation.ready = (self.fugue_sequencer._snapshot(), prepared)
+
     
     def test_initialization(self):
         """Test fugue sequencer initialization."""

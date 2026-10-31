@@ -13,6 +13,7 @@ import random
 import logging
 from state import State
 from scale_mapper import ScaleMapper
+from musical_time import step_beats
 from note_utils import format_note_with_number, format_rest
 
 log = logging.getLogger(__name__)
@@ -156,6 +157,11 @@ class SongSequencer:
         self._base_gate_length = 0.8
         self._base_gate_length_range = 0.3
         
+        self._musical_position = 0.0
+        self._section_origin = 0.0
+        self._standalone_position = 0.0
+        self._step_beats = step_beats(state.get("note_division", "sixteenth"))
+
         # Voice management for polyphonic compositions
         self._voice_patterns: Dict[int, List[int]] = {}  # voice_id -> note pattern
         self._voice_octave_shifts: Dict[int, int] = {}  # voice_id -> octave shift
@@ -165,9 +171,8 @@ class SongSequencer:
     
     def start_new_song(self):
         """Start a new song composition with a randomly selected pattern."""
-        if self._between_songs:
-            # Still in between-songs period
-            return
+        self._between_songs = False
+        self._section_origin = self._musical_position
         
         # Select a random pattern
         pattern_name = random.choice(list(SONG_PATTERNS.keys()))
@@ -248,73 +253,55 @@ class SongSequencer:
         
         log.info(f"song_section_started {section_info}")
     
-    def get_next_step_notes(self, step: int) -> List[Tuple[int, int, float]]:
-        """
-        Generate notes for the next step in song mode.
-        
-        Args:
-            step: Current step number
-            
-        Returns:
-            List of (note, velocity, duration) tuples for this step
-        """
+    def update_transport(self, beat: float) -> None:
+        """Advance section boundaries from elapsed beats, even between pattern steps."""
+        self._musical_position = beat
+        self._check_section_advancement(beat)
+
+    def get_next_step_notes(self, step: int, beat: Optional[float] = None,
+                            beats_per_step: Optional[float] = None,
+                            bpm: Optional[float] = None) -> List[Tuple[int, int, float]]:
+        """Emit a pattern step at an explicit beat; standalone calls advance elapsed time."""
+        self._step_beats = (beats_per_step if beats_per_step is not None else
+                            step_beats(self.state.get('note_division', 'sixteenth')))
+        self._playback_bpm = bpm if bpm is not None else self.state.get('bpm', 120.0)
+        if beat is None:
+            beat = self._standalone_position
+            self._standalone_position += self._step_beats
+        self._musical_position = beat
+        previous_bpm = self.state.get('bpm', 120.0)
         if self._between_songs:
-            # Check if we should start a new song
-            elapsed = time.perf_counter() - self._between_songs_start
-            if elapsed >= 5.0:  # 5 second pause between songs
-                self.start_new_song()
-            return []  # No notes during between-songs period
-        
+            if time.perf_counter() - self._between_songs_start < 5.0:
+                return []
+            self.start_new_song()
         if not self._current_pattern:
             self.start_new_song()
-            if not self._current_pattern:
-                return []
-        
-        # Check if we need to advance to the next section
-        self._check_section_advancement(step)
-        
-        if self._current_section_index >= len(self._current_pattern.sections):
-            # Song is complete, start between-songs period
-            self._start_between_songs()
+        self._check_section_advancement(beat)
+        if self._between_songs:
             return []
-        
-        # Generate notes for current section
+        if self.state.get('bpm', 120.0) != previous_bpm:
+            self._playback_bpm = self.state.get('bpm', 120.0)
         return self._generate_section_notes(step)
-    
-    def _check_section_advancement(self, step: int):
-        """Check if we should advance to the next section based on timing."""
-        if not self._current_pattern or self._current_section_index >= len(self._current_pattern.sections):
+
+    def _check_section_advancement(self, beat: float) -> None:
+        """Complete sections at their elapsed 4/4 boundaries, never at pattern wraps."""
+        if not self._current_pattern:
             return
-        
-        current_section = self._current_pattern.sections[self._current_section_index]
-        
-        # Calculate beats per bar (assuming 4/4 time)
-        beats_per_bar = 4
-        bpm = self.state.get('bpm', 120.0)
-        steps_per_beat = 4  # 16th notes
-        
-        # Calculate how many steps represent one bar
-        steps_per_bar = beats_per_bar * steps_per_beat
-        
-        # Check if we've completed the required number of bars for this section
-        bars_completed = self._section_bar_count
-        
-        # Increment bar count based on step progression
-        if step % steps_per_bar == 0 and step > 0:
-            self._section_bar_count += 1
-            bars_completed = self._section_bar_count
-        
-        if bars_completed >= current_section.bars:
-            # Move to next section
+        while self._current_section_index < len(self._current_pattern.sections):
+            section = self._current_pattern.sections[self._current_section_index]
+            elapsed = beat - self._section_origin
+            self._section_bar_count = int(elapsed // 4)
+            if elapsed < section.bars * 4:
+                return
+            self._section_origin += section.bars * 4
             self._current_section_index += 1
             self._section_start_time = time.perf_counter()
             self._section_bar_count = 0
-            
             if self._current_section_index < len(self._current_pattern.sections):
                 self._apply_section_settings()
-            else:
-                log.info(f"song_completed pattern={self._current_pattern.name}")
-    
+        log.info("song_completed pattern=%s", self._current_pattern.name)
+        self._start_between_songs()
+
     def _start_between_songs(self):
         """Start the pause between songs."""
         self._between_songs = True
@@ -348,7 +335,7 @@ class SongSequencer:
         return notes
     
     def _generate_voice_note(self, voice_id: int, step: int, section: SongSection) -> Optional[Tuple[int, int, float]]:
-        """Generate a note for a specific voice."""
+        """Generate a voice note with articulation relative to the active pattern division."""
         # Check section density (acts as note probability for this voice)
         if random.random() > section.density:
             return None
@@ -405,8 +392,8 @@ class SongSequencer:
         final_velocity = max(1, min(127, final_velocity))
         
         # Calculate duration
-        bpm = self.state.get('bpm', 120.0)
-        step_duration = 60.0 / (bpm * 4)  # Duration of one 16th note
+        bpm = getattr(self, '_playback_bpm', self.state.get('bpm', 120.0))
+        step_duration = 60.0 * self._step_beats / bpm
         gate_length_factor = self._base_gate_length
         duration = step_duration * gate_length_factor
         
@@ -457,7 +444,8 @@ class SongSequencer:
         }
     
     def force_next_section(self):
-        """Force advancement to the next section (for testing/debugging)."""
+        """Advance manually and measure the next section from the current beat."""
+        self._section_origin = self._musical_position
         if self._current_pattern and self._current_section_index < len(self._current_pattern.sections):
             self._current_section_index += 1
             self._section_start_time = time.perf_counter()

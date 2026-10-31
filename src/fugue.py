@@ -13,6 +13,7 @@ import logging
 import math
 from state import State
 from scale_mapper import ScaleMapper
+from fugue_preparation import PreparationRequest, ScorePreparation
 
 log = logging.getLogger(__name__)
 
@@ -165,12 +166,12 @@ class FugueEngine:
 
         # Pairwise checks per time step
         for k in range(steps - 1):
-            # Voice crossing (static)
+            # Earlier indices are higher registers (soprano, alto, tenor, bass).
             for i in range(V):
                 for j in range(i + 1, V):
                     a = P[i][k]
                     b = P[j][k]
-                    if a is not None and b is not None and a > b:
+                    if a is not None and b is not None and a < b:
                         cost_cross += 1.0
 
             # Dissonance on strong beats
@@ -1228,161 +1229,99 @@ class FugueEngine:
 
 
 class FugueSequencer:
-    """Handles fugue playback within the main sequencer framework."""
-    
+    """Play prepared score events against parent transport without rendering on ticks."""
+
     def __init__(self, state: State, scale_mapper: ScaleMapper):
         self.state = state
         self.scale_mapper = scale_mapper
-        self.fugue_engine = FugueEngine(scale_mapper)
-        
-        # Fugue state
-        self._active_fugue: Optional[Score] = None
-        self._fugue_start_time: float = 0.0
-        self._fugue_params: Optional[FugueParams] = None
-        self._last_fugue_end: float = 0.0
-        self._rest_duration: float = 10.0  # 10 seconds between fugues (reduced from 10)
-        
-        # Musical timing state (tracks the fugue's internal musical time)
-        self._fugue_musical_time: float = 0.0  # Current time in quarter notes
-        self._voice_next_times: List[float] = []  # Next note time for each voice
-        self._voice_positions: List[int] = []     # Current note index per voice
-        
-        log.info("fugue_sequencer_initialized")
-    
-    def start_new_fugue(self):
-        """Start a new fugue generation and playback."""
-        # Generate parameters from current state
-        voices = self.state.get('voices', 3)  # Default to 3 voices
-        voices = max(1, min(4, voices))  # Clamp to valid range (1-4)
-        
-        self._fugue_params = FugueParams(
-            n_voices=voices,
-            key_root=self.state.get('root_note', 60),
-            mode=self.state.get('scale_mode', 'minor'),
-            entry_gap_beats=2.0,
-            stretto_overlap=self.state.get('density', 0.5) * 0.5,  # Higher density = more stretto
-            use_tonal_answer=True,
-            episode_density=self.state.get('density', 0.5),
-        )
-        
-        # Generate subject
-        subject = self.fugue_engine.generate_subject(self._fugue_params, bars=1)
-        
-        # Generate complete fugue
-        self._active_fugue = self.fugue_engine.render_fugue(subject, self._fugue_params)
-        self._fugue_start_time = time.perf_counter()
-        
-        # Initialize musical timing
+        self._epoch = 0
+        self._active_fugue = None
+        self._fugue_start_time = 0.0
+        self._last_fugue_end = float('-inf')
+        self._rest_duration = 10.0
+        self._origin = 0.0
+        self._event_position = 0
         self._fugue_musical_time = 0.0
+        self._standalone_beat = 0.0
+        self.preparation = ScorePreparation(self._snapshot)
 
-        # Calculate when each voice's first note should play
-        # Voices now contain inserted rests to encode timing, so all start at 0
-        self._voice_next_times = [0.0] * len(self._active_fugue)
-        self._voice_positions = [0] * len(self._active_fugue)
+    def _snapshot(self) -> Optional[PreparationRequest]:
+        """Capture a small immutable snapshot for submission and stale-result checks."""
+        if self.state.get('direction_pattern', 'forward') != 'fugue':
+            return None
+        return PreparationRequest(
+            self._epoch, max(1, min(4, self.state.get('voices', 3))),
+            self.scale_mapper.root_note, self.state.get('scale_mode', 'minor'),
+            self.state.get('density', 0.5), tuple(self.scale_mapper.current_scale_intervals))
 
-        log.info(
-            f"fugue_started voices={len(self._active_fugue)} "
-            f"entry_times={self._voice_next_times} "
-            f"total_notes={sum(len(v) for v in self._active_fugue)}"
-        )
-    
-    def should_start_new_fugue(self) -> bool:
-        """Check if it's time to start a new fugue."""
-        current_time = time.perf_counter()
-        
-        # If no active fugue and rest period has passed
-        if self._active_fugue is None:
-            if current_time - self._last_fugue_end >= self._rest_duration:
-                log.info(f"starting_new_fugue rest_period_elapsed={current_time - self._last_fugue_end:.1f}s")
-                return True
-            else:
-                log.debug(f"waiting_for_rest_period remaining={self._rest_duration - (current_time - self._last_fugue_end):.1f}s")
-                return False
-        
-        # If current fugue has been running for more than 5 minutes
-        if current_time - self._fugue_start_time >= 300.0:  # 5 minutes
+    def invalidate_preparation(self) -> None:
+        """Reject stale work immediately; leaving fugue mode also abandons playback."""
+        self._epoch += 1
+        if self.state.get('direction_pattern', 'forward') != 'fugue':
             self._active_fugue = None
-            self._last_fugue_end = current_time
-            log.info("fugue_completed max_duration_reached")
+            self._last_fugue_end = float('-inf')
+            self.preparation.waiting = False
+
+    def start_preparation(self) -> None:
+        """Start background preparation from the engine lifecycle, outside clock callbacks."""
+        self.preparation.start()
+
+    def stop_preparation(self) -> None:
+        """Release process resources when the parent sequencer stops."""
+        self.preparation.stop()
+
+    def start_new_fugue(self, beat: float = 0.0) -> bool:
+        """Adopt an already prepared score by reference; never generate or wait here."""
+        ready = self.preparation.ready
+        if ready is None or ready is self.preparation.consumed or ready[0] != self._snapshot():
+            self.preparation.waiting = True
             return False
-        
-        return False
-    
-    def get_next_step_notes(self, step: int) -> List[Tuple[int, int, float]]:
-        """Get all notes that should play for the current step in fugue mode.
-        
-        This method is called on each sequencer step and determines if any
-        fugue voices should play notes at this moment based on sequencer timing.
-        Multiple voices can play simultaneously for proper polyphonic fugue playback.
-        
-        Returns:
-            List of tuples (pitch, velocity, duration) for all notes to play.
-            Empty list if no notes should play at this moment.
+        self.preparation.consumed = ready
+        self.preparation.waiting = False
+        self._active_fugue = ready[1]
+        self._origin = beat
+        self._event_position = 0
+        self._fugue_musical_time = 0.0
+        self._fugue_start_time = time.perf_counter()
+        return True
+
+    def should_start_new_fugue(self) -> bool:
+        """Honor the existing inter-composition rest and five-minute playback ceiling."""
+        now = time.perf_counter()
+        if self._active_fugue is not None and now - self._fugue_start_time >= 300.0:
+            self._active_fugue = None
+            self._last_fugue_end = now
+            return False
+        return self._active_fugue is None and now - self._last_fugue_end >= self._rest_duration
+
+    def get_next_step_notes(self, step: int, beat: Optional[float] = None,
+                            bpm: Optional[float] = None) -> List[Tuple[int, int, float]]:
+        """Emit due onsets at the current beat; standalone calls use sixteenth resolution.
+
+        Parent playback calls this every clock tick, independently of pattern
+        division. Off-grid events are dispatched at the first following tick.
         """
-        if not self._active_fugue:
-            if self.should_start_new_fugue():
-                self.start_new_fugue()
-            else:
+        if beat is None:
+            beat = self._standalone_beat
+            self._standalone_beat += 0.25
+        eligible = self.should_start_new_fugue()
+        if self._active_fugue is None:
+            if not eligible or abs(beat % 4) > 1e-9 or not self.start_new_fugue(beat):
                 return []
-        
-        if not self._active_fugue:
-            return []
-        
-        # Calculate musical time progression based on sequencer steps
-        # Each step represents a 16th note (1/4 quarter note)
-        bpm = self.state.get('bpm', 110.0)
-        quarter_note_duration = 60.0 / bpm
-        step_duration = quarter_note_duration / 4  # 16th note duration
-        
-        # Update musical time based on step progression
-        # Each call advances by one 16th note (0.25 quarter notes)
-        self._fugue_musical_time += 0.25
-        
-        # Collect all notes that should play at this moment
-        notes_to_play = []
-        
-        # Check each voice to see if it's time to play its next note
-        for voice_idx in range(len(self._active_fugue)):
-            voice = self._active_fugue[voice_idx]
-            
-            # Skip if this voice is exhausted
-            if self._voice_positions[voice_idx] >= len(voice):
-                continue
-            
-            # Check if it's time for this voice's next note
-            if self._fugue_musical_time >= self._voice_next_times[voice_idx]:
-                note = voice[self._voice_positions[voice_idx]]
-                
-                # Schedule next note for this voice
-                self._voice_next_times[voice_idx] += note['dur']
-                self._voice_positions[voice_idx] += 1
-                
-                # Convert duration to seconds
-                duration_seconds = note['dur'] * quarter_note_duration
-                
-                # Handle rests vs notes
-                if note['pitch'] is None:
-                    # This is a rest - don't add to notes_to_play
-                    log.debug(f"fugue_rest voice={voice_idx} musical_time={self._fugue_musical_time:.2f} "
-                             f"dur={duration_seconds:.3f}s")
-                else:
-                    # This is a note - add it to the list for simultaneous playback
-                    notes_to_play.append((note['pitch'], note['vel'], duration_seconds))
-                    log.debug(f"fugue_note voice={voice_idx} musical_time={self._fugue_musical_time:.2f} "
-                             f"note={note['pitch']} dur={duration_seconds:.3f}s")
-        
-        # Check if all voices are exhausted
-        all_exhausted = all(
-            pos >= len(voice) 
-            for pos, voice in zip(self._voice_positions, self._active_fugue)
-        )
-        
-        if all_exhausted:
+        score = self._active_fugue
+        self._fugue_musical_time = beat - self._origin
+        bpm = bpm if bpm is not None else self.state.get('bpm', 110.0)
+        notes = []
+        while self._event_position < len(score.events):
+            onset, group = score.events[self._event_position]
+            if onset > self._fugue_musical_time + 1e-9:
+                break
+            notes.extend((pitch, vel, dur * 60.0 / bpm) for pitch, vel, dur in group)
+            self._event_position += 1
+        if self._fugue_musical_time + 1e-9 >= score.end_beat:
             self._active_fugue = None
             self._last_fugue_end = time.perf_counter()
-            log.info(f"fugue_completed all_voices_exhausted musical_time={self._fugue_musical_time:.2f}")
-        
-        return notes_to_play
+        return notes
 
 
 def create_fugue_sequencer(state: State, scale_mapper: ScaleMapper) -> FugueSequencer:
