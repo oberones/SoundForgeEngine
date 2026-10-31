@@ -46,7 +46,7 @@ class HighResClock:
     Provides accurate timing for sequencer steps with swing support.
     """
     
-    def __init__(self, bpm: float = 110.0, ppq: int = 24, swing: float = 0.0):
+    def __init__(self, bpm: float = 110.0, ppq: int = 24, swing: float = 0.0, spin_seconds: float = 0.0005):
         self.bpm = bpm
         self.ppq = ppq  # Pulses per quarter note
         self.swing = swing
@@ -56,6 +56,7 @@ class HighResClock:
         self._start_time = 0.0
         self._tick_count = 0
         self._drift_accumulator = 0.0
+        self.spin_seconds = min(.0005, max(0.0, spin_seconds))
     
     def set_tick_callback(self, callback: Callable[[TickEvent], None]):
         """Set the callback for tick events."""
@@ -94,7 +95,7 @@ class HighResClock:
         log.debug(f"clock_params_updated bpm={self.bpm} swing={self.swing}")
     
     def _clock_thread(self):
-        """Main clock thread with drift correction."""
+        """Wait on absolute deadlines with a bounded final spin and no catch-up burst."""
         next_tick_time = self._start_time
         
         while self._running:
@@ -115,27 +116,22 @@ class HighResClock:
                     target_time += swing_offset
                     swing_adjusted = True
             
-            # Add accumulated drift compensation
-            target_time += self._drift_accumulator
-            
-            # Sleep until target time
-            current_time = time.perf_counter()
-            sleep_time = target_time - current_time
-            
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-            else:
-                # We're behind - accumulate the drift
-                self._drift_accumulator += sleep_time
-                # Limit drift accumulation to prevent runaway
-                self._drift_accumulator = max(-0.01, min(0.01, self._drift_accumulator))
-                
-                # If we're consistently behind, reset timing to prevent spiral
-                if sleep_time < -0.1:  # More than 100ms behind
-                    log.warning(f"Clock timing reset due to drift (behind by {-sleep_time:.3f}s)")
-                    next_tick_time = current_time
-                    self._drift_accumulator = 0.0
-            
+            # Absolute deadlines prevent previous scheduler delays becoming tempo drift.
+            remaining = target_time - time.perf_counter()
+            while self._running and remaining > self.spin_seconds:
+                # Short sleeps reduce host timer coalescing without extending spinning.
+                delay = remaining - self.spin_seconds
+                time.sleep(min(delay, .001) if self.spin_seconds else delay)
+                remaining = target_time - time.perf_counter()
+            while self._running and time.perf_counter() < target_time:
+                pass  # At most the configured final 0.5 ms; no priority escalation.
+            if not self._running:
+                break
+            actual_time = time.perf_counter()
+            if actual_time - target_time > tick_interval:
+                # Preserve musical tick count, but do not burst missed clock callbacks.
+                next_tick_time = actual_time
+
             # Emit tick event
             if self._tick_callback:
                 actual_time = time.perf_counter()
@@ -192,8 +188,8 @@ class Sequencer:
         # Playback object is cheap; its worker starts with the engine lifecycle.
         self._fugue_sequencer: FugueSequencer = FugueSequencer(state, self.scale_mapper)
 
-        # Song sequencer (lazy initialized)  
-        self._song_sequencer: Optional[SongSequencer] = None
+        # Song playback is cheap; its preparation worker starts with the engine.
+        self._song_sequencer: Optional[SongSequencer] = SongSequencer(state, self.scale_mapper)
 
         # Listen for state changes
         self.state.add_listener(self._on_state_change)
@@ -354,17 +350,8 @@ class Sequencer:
         Returns:
             List of boolean values for the pattern
         """
-        presets = {
-            'four_on_floor': [True, False, False, False, True, False, False, False],
-            'offbeat': [False, True, False, True, False, True, False, True],
-            'every_other': [True, False, True, False, True, False, True, False],
-            'syncopated': [True, False, True, True, False, True, False, False],
-            'dense': [True, True, False, True, True, False, True, True],
-            'sparse': [True, False, False, False, False, False, True, False],
-            'all_on': [True] * 8,
-            'all_off': [False] * 8
-        }
-        
+        from rhythm import PATTERNS
+        presets = PATTERNS
         if preset_name in presets:
             return presets[preset_name]
         else:
@@ -516,6 +503,7 @@ class Sequencer:
             return
         self._running = True
         self._fugue_sequencer.start_preparation()
+        self._song_sequencer.start_preparation()
         if not self._started_once:
             self._started_once = True
             self._generate_step_note(self._current_step)
@@ -527,6 +515,7 @@ class Sequencer:
         self.clock.stop()
         self._running = False
         self._fugue_sequencer.stop_preparation()
+        self._song_sequencer.stop_preparation()
         log.info("sequencer_stopped")
 
     def _update_clock_from_state(self):
@@ -767,20 +756,20 @@ class Sequencer:
                 degree += sum(1 for active in step_pattern[:position] if active)
             note = self.scale_mapper.get_note(degree, octave=0)
             
-            # Phase 5.5: Velocity variation based on probability values
+            # Metrical accents and expression are independent of occurrence probability.
             base_velocity = self.state.get('base_velocity', 80)
             velocity_range = self.state.get('velocity_range', 40)  # +/- range
             
-            # Scale velocity based on step probability (higher prob = higher velocity)
-            # Also add some randomness based on the probability
-            velocity_factor = 0.5 + (step_prob * 0.5)  # 0.5 to 1.0 range
-            velocity_random = random.uniform(-0.2, 0.2) * step_prob  # More randomness for higher probs
+            # Accent the elapsed downbeat.
+            # Add bounded expression variation.
+            velocity_factor = 0.8 if (self._transport_ticks / self.clock.ppq) % 4 == 0 else 0.5  # 0.5 to 1.0 range
+            velocity_random = random.uniform(-0.2, 0.2)  # Independent of occurrence
             
             final_velocity_factor = max(0.1, min(1.0, velocity_factor + velocity_random))
             velocity = int(base_velocity + (velocity_range * (final_velocity_factor - 0.5)))
             velocity = max(1, min(127, velocity))  # Clamp to MIDI range
             
-            # Gate length variation based on probability values (similar to velocity)
+            # Articulation varies independently of occurrence.
             bpm = self.clock.bpm
             step_duration = 60.0 * step_beats(self._active_division) / bpm
             
@@ -788,10 +777,10 @@ class Sequencer:
             base_gate_length = self.state.get('base_gate_length', 0.8)
             gate_length_range = self.state.get('gate_length_range', 0.3)  # +/- range
             
-            # Scale gate length based on step probability (higher prob = longer gate)
-            # Also add some randomness based on the probability
-            gate_factor = 0.5 + (step_prob * 0.5)  # 0.5 to 1.0 range
-            gate_random = random.uniform(-0.15, 0.15) * step_prob  # Subtle randomness for higher probs
+            # Keep the configured gate as the center of variation.
+            # Add bounded expression variation.
+            gate_factor = 0.5  # Centered on the configured gate
+            gate_random = random.uniform(-0.15, 0.15)  # Bounded articulation variation
             
             final_gate_factor = max(0.1, min(1.0, gate_factor + gate_random))
             gate_length_factor = base_gate_length + (gate_length_range * (final_gate_factor - 0.5))

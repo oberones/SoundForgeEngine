@@ -518,3 +518,135 @@ warnings, using local socket access for live-server tests. The first sandbox run
 could not bind localhost and skipped seven server tests; that run was superseded
 by the complete rerun. Raw output:
 [`backend-tests.txt`](validation/generative-engine/backend-tests.txt).
+
+## Musical improvements implementation — 2026-10-31
+
+This follow-up implements the remaining F07/F08/F10/F11 corrections and M01–M05
+capabilities. It preserves the historical review and earlier transport repair record.
+The implementation specification is in
+[`specs/002-generative-improvements`](../specs/002-generative-improvements/spec.md).
+
+- **F07/F11:** fugue and song composition use private seeded streams. Worker requests
+  carry composition seeds; retries retain their identity and adoption advances the
+  upcoming seed. Fugue interval branches now use cumulative 60/30/10 thresholds.
+- **F08:** song playback consumes the shared rhythm masks using elapsed section-step
+  counts, resets them at section boundaries, and uses `all_on` without an override.
+- **F10:** a bounded output worker serializes attacks and monotonic releases. Same-
+  channel/pitch attacks explicitly release the previous owner before retriggering;
+  replacement deadlines invalidate old releases. Broadcast channels expand before
+  ownership; shutdown flushes active notes. Overflow logs and performs a worker-side
+  panic rather than blocking the musical callback.
+- **M01/M02:** immutable song tables include diatonic chord timelines, dominant-seventh
+  twelve-bar blues, tonic-drone Minimalist, separate section motifs, returning first
+  halves, and bounded sequence/displacement/ornamentation in developed second halves.
+  Outro endings resolve to tonic. Existing preset lengths and tempo factors remain.
+- **M03/M04:** song voices have descending, disjoint registers, chord-aware notes,
+  bass roots, sustained inner voices, answering rhythms, metrical accents and phrase-
+  ending space. Fugue optimization adds chromatic preparation/resolution costs and
+  rejects candidates that worsen crossing or tonal costs. This is a constrained
+  improvement, not a guarantee of zero fugue crossings or dissonances. Standard-mode
+  probability no longer indirectly scales velocity or gate duration.
+- **M05:** the evaluation tool exports fixed-seed events, MIDI, metrics, harmony/motif
+  metadata and source hashes. Archived-source baseline and current performances are
+  retained alongside density/velocity-matched diagnostic pairs. No dependency or
+  public route, configuration key, dashboard control or hardware action was added.
+
+Song generation uses the existing bounded process-coordinator mechanism. Playback
+reads immutable tables. Scale/root/voice changes prepare replacements and adopt them
+at elapsed bar boundaries; late work defers adoption. Pattern division remains live
+at its existing step boundary. Each song step consumes prepared attacks crossed
+since the previous callback, keeping the latest attack per voice. This preserves
+playback when a live division change leaves steps offset from the prepared grid.
+Masked steps discard their attacks; section transitions reset the attack cursor.
+Lookup is bounded to 16 quarter-beat rows (the longest supported division), and
+melody gates use the newly active division, clipped at the section boundary.
+Failed preparation retries with the same seed after
+five seconds; there is no synchronous callback fallback. Timing/input paths queue
+MIDI work instead of writing to the device.
+
+### Final automated evidence
+
+| Check | Result |
+| --- | --- |
+| Full backend suite, with localhost access | **PASS: 411 tests in 14.05 seconds**, no skips or warnings. |
+| Frontend Vitest | **PASS: 3 tests.** |
+| TypeScript/Vite production build | **PASS.** |
+| Playwright command | **3 skipped placeholders; no browser acceptance coverage.** |
+| Exported MIDI decode/ownership audit | **PASS: 32 files**, balanced attacks/releases and no unowned overlapping pitch attacks. |
+| Diff whitespace check | **PASS.** |
+
+The first full sandbox run skipped localhost tests; the completed run above
+supersedes it. Backend output is retained as
+[`backend-tests.txt`](validation/generative-engine/improvements/backend-tests.txt).
+New tests cover seed isolation/replay/advancement, interval thresholds, all six song
+presets with one through four voices, extreme MIDI roots, motif recurrence, cadence
+placement, masks, stale/late preparation, live scale adoption, probability-independent
+expression, monotonic retrigger ownership, broadcast, overload, shutdown, absolute
+clock recovery and MIDI export. Existing transport and preparation tests continue
+to cover division/tempo changes, full-song transitions and worker retry/lifecycle.
+
+The seed-1729 event audit observed zero song register crossings. Fugue crossing
+observations fell from 47 to 21 for three voices and from 45 to 16 for four voices
+in these fixtures; those are event-level observations, not a complete proof of
+voice ordering or musical quality. Raw song performances are substantially sparser;
+the comparison directory supplies explicit density-matched diagnostic variants.
+
+### Clock tuning and open acceptance
+
+The clock now uses absolute deadlines without accumulating wakeup delay into later
+deadlines. Severe lateness rebases the next wall-clock deadline without bursting
+missed callbacks or advancing musical position artificially. In tuned operation,
+sleeps are capped at 1 ms before a final spin capped at 0.5 ms. No elevated process
+priority or relaxed timing threshold is used.
+
+Sleep-only baseline deadline-error medians remained around 2 ms. Final tuned
+baseline medians were approximately 0.0007–0.0010 ms, with parent CPU around
+7.1–7.4% versus approximately 4% sleep-only. Outliers persist; lower median error
+does **not** satisfy the hard maximum-jitter requirement.
+
+Final isolated load measurement: macOS 26.6.2 arm64, Python 3.14.6, 200 BPM,
+24 PPQ, zero swing, 12 seconds per mode/voice setting. The fake MIDI sink measures
+queued output delivery, and semantic triggers include a raw note and the production
+note callback. Generation and pauses are shortened only in the benchmark.
+
+| Mode / voices | Handoffs | Max callback | Max deadline error | Max semantic dispatch | Max MIDI queue delay | Parent CPU |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Fugue / 3 | 9 | 0.305 ms | 3.660 ms | 0.608 ms | 4.174 ms | 6.00% |
+| Fugue / 4 | 9 | 0.294 ms | 2.045 ms | 0.831 ms | 1.331 ms | 5.62% |
+| Song / 3 | 13 | 0.770 ms | 3.051 ms | 1.450 ms | 1.181 ms | 8.68% |
+| Song / 4 | 13 | 0.928 ms | 2.629 ms | 0.660 ms | 1.537 ms | 8.68% |
+
+No MIDI commands were dropped. Even the conservative sum of maximum semantic
+processing and maximum queue delay remains below 10 ms locally. **All four runs
+still FAIL the under-2-ms deadline-error gate** and the timing tool exits nonzero.
+F03 performance acceptance remains open. Parent CPU excludes spawned renderer CPU;
+these are short local observations, not deployment certification.
+
+Raw baseline, initial tuning and final load records are under
+[`improvements/`](validation/generative-engine/improvements/). The
+[acceptance worksheet](validation/generative-engine/improvements/ACCEPTANCE.md)
+provides reproduction instructions and listening/device gates. Physical MIDI,
+native device response, Raspberry Pi timing and listening quality remain **NOT
+VALIDATED**. Maintainers must qualify these on the intended hardware and close the
+unchanged timing gate before claiming performance acceptance.
+
+### Live division playback follow-up
+
+Changing a running song from sixteenths to quarters at beat 0.25 previously
+sampled only odd prepared rows and silenced the initial arrangements. Playback now
+consumes crossed attacks once, retaining the latest per voice at each live step.
+The regression coverage includes eighth/quarter/half/whole changes at four step
+phases with three/four voices through intro, verse and chorus, a return to
+sixteenths, muted steps, forced sections and off-grid section origins.
+
+- Before the fix, 18 of the initial 19 regression cases failed. The final expanded
+  regression file passes all 36 cases.
+- Full backend suite with localhost access: **447 passed in 14.20 seconds**, no
+  skips. Frontend: **3 tests passed**, TypeScript check and production build passed.
+- `.venv/bin/python tools/check_generative_timing.py --seconds 6` remains **FAIL**.
+  Song callback maxima were 0.249/3.455 ms for three/four voices; deadline-error
+  maxima were 2.647/7.048 ms. The four-voice conservative dispatch-plus-queue maximum
+  was 10.064 ms; no MIDI commands were dropped. This short local run overlapped
+  other automated checks and does not establish performance acceptance or causality.
+  F03 and device qualification remain open. Raw results:
+  [`live-division-timing.json`](validation/generative-engine/live-division-timing.json).

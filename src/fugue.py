@@ -67,9 +67,10 @@ class Entry:
 class FugueEngine:
     """Engine for generating fugues according to the specification."""
     
-    def __init__(self, scale_mapper: ScaleMapper):
+    def __init__(self, scale_mapper: ScaleMapper, seed: Optional[int] = None):
         self.scale_mapper = scale_mapper
-        self._generate_seed_for_determinism()
+        self._seed = seed if seed is not None else random.SystemRandom().getrandbits(64)
+        self.rng = random.Random(self._seed)
         # Default voice ranges (absolute MIDI), tuned for C-min/maj root around 60
         # If params.ranges is None, we map these around key_root by octave shifts as needed
         self._default_ranges_abs = [
@@ -136,6 +137,25 @@ class FugueEngine:
             return False
         return (step_index % quarter_steps) == 0
 
+    def _tonal_cost(self, score: Score, params: FugueParams) -> float:
+        """Charge chromatic tones unless prepared and resolved by adjacent scale tones."""
+        pcs = {(params.key_root + i) % 12 for i in self.scale_mapper.current_scale_intervals}
+        cost = 0.0
+        for voice in score:
+            beat = 0.0
+            for index, note in enumerate(voice):
+                pitch = note['pitch']
+                if pitch is not None and pitch % 12 not in pcs:
+                    before = voice[index - 1]['pitch'] if index else None
+                    after = voice[index + 1]['pitch'] if index + 1 < len(voice) else None
+                    resolved = (before is not None and after is not None
+                        and before % 12 in pcs and after % 12 in pcs
+                        and 0 < abs(pitch - before) <= 2 and 0 < abs(after - pitch) <= 2)
+                    strong = abs(beat % 1) < 1e-9
+                    cost += .25 if resolved and not strong else 4.0 if resolved else 12.0
+                beat += note['dur']
+        return cost
+
     def _score_counterpoint(self, score: Score, params: FugueParams) -> Tuple[float, Dict[str, float]]:
         G = self._grid
         Gd = self._gridify(score, G)
@@ -165,7 +185,7 @@ class FugueEngine:
                 prev = cur
 
         # Pairwise checks per time step
-        for k in range(steps - 1):
+        for k in range(steps):
             # Earlier indices are higher registers (soprano, alto, tenor, bass).
             for i in range(V):
                 for j in range(i + 1, V):
@@ -182,6 +202,9 @@ class FugueEngine:
                         if iv is not None and not self._is_consonant(iv):
                             w = 0.25 if k >= cadence_start else 1.0
                             cost_disson += w
+
+            if k == steps - 1:
+                continue
 
             # Parallels and direct perfects between k and k+1
             for i in range(V):
@@ -218,15 +241,18 @@ class FugueEngine:
                     if O[i][k] and O[j][k] and P[i][k] is not None and P[i][k] == P[j][k]:
                         hard_unison += 0.0 if k >= cadence_start else 5.0
 
+        tonal_cost = self._tonal_cost(score, params)
         total = (
             params.w_parallel * cost_parallel
             + params.w_direct * cost_direct
             + params.w_disson * cost_disson
             + params.w_cross * cost_cross
             + params.w_smooth * reward_smooth
+            + tonal_cost
             + hard_unison  # enforced hard cost, independent weight
         )
         details = {
+            "tonal": tonal_cost,
             "parallel": cost_parallel,
             "direct": cost_direct,
             "disson": cost_disson,
@@ -238,7 +264,7 @@ class FugueEngine:
 
     def _optimize_counterpoint(self, score: Score, params: FugueParams, passes: int = 1) -> Score:
         """Greedy improvement: try small pitch tweaks to reduce counterpoint score.
-        Proposals: octave shifts and semitone neighbors, respecting voice ranges.
+        Proposals: octave shifts and nearby tones, respecting ranges, tonality and ordering.
         """
         if not score:
             return score
@@ -251,12 +277,8 @@ class FugueEngine:
             base = self._default_ranges_abs[:len(score)]
             ranges = [(lo + offset, hi + offset) for (lo, hi) in base]
 
-        def eval_score(s: Score) -> float:
-            total, _ = self._score_counterpoint(s, params)
-            return total
-
         cur = score
-        cur_cost = eval_score(cur)
+        cur_cost, cur_detail = self._score_counterpoint(cur, params)
         for _ in range(passes):
             improved = False
             for v_idx, voice in enumerate(cur):
@@ -265,7 +287,7 @@ class FugueEngine:
                     p = n['pitch']
                     if p is None:
                         continue
-                    proposals = [p - 12, p + 12, p - 1, p + 1]
+                    proposals = [p - 12, p + 12, p - 2, p - 1, p + 1, p + 2]
                     best_local = cur_cost
                     best_pitch = None
                     for new_p in proposals:
@@ -277,14 +299,19 @@ class FugueEngine:
                         cand_note = Note(pitch=new_p, dur=n['dur'], vel=n['vel'])
                         cand_voice[i] = cand_note
                         cand_score[v_idx] = cand_voice
-                        sc = eval_score(cand_score)
+                        sc, detail = self._score_counterpoint(cand_score, params)
+                        old_detail = cur_detail
+                        if (detail['cross'] > old_detail['cross'] or detail['tonal'] > old_detail['tonal']):
+                            continue
                         if sc + 1e-6 < best_local:
                             best_local = sc
                             best_pitch = new_p
+                            best_detail = detail
                     if best_pitch is not None:
                         # Commit improvement
                         cur[v_idx][i] = Note(pitch=best_pitch, dur=n['dur'], vel=n['vel'])
                         cur_cost = best_local
+                        cur_detail = best_detail
                         improved = True
             if not improved:
                 break
@@ -324,14 +351,20 @@ class FugueEngine:
                                     ranges = [(lo + offset, hi + offset) for (lo, hi) in base]
                                 lo, hi = ranges[j]
                                 if lo <= new_p <= hi:
-                                    score[j][note_idx] = Note(pitch=new_p, dur=score[j][note_idx]['dur'], vel=score[j][note_idx]['vel'])
-                                    break
+                                    original = score[j][note_idx]
+                                    before_cost, before = self._score_counterpoint(score, params)
+                                    score[j][note_idx] = Note(pitch=new_p, dur=original['dur'], vel=original['vel'])
+                                    after_cost, after = self._score_counterpoint(score, params)
+                                    if after['cross'] <= before['cross'] and after_cost <= before_cost:
+                                        break
+                                    score[j][note_idx] = original
             # Optional: could add a similar gentle fix for direct perfects
         return score
     
     def _generate_seed_for_determinism(self):
         """Generate a seed for deterministic fugue generation."""
-        self._seed = random.randint(0, 2**31 - 1)
+        self._seed = random.SystemRandom().getrandbits(64)
+        self.rng = random.Random(self._seed)
         log.debug(f"fugue_seed={self._seed}")
     
     def generate_subject(self, params: FugueParams, bars: int = 1) -> Phrase:
@@ -344,7 +377,7 @@ class FugueEngine:
         - Cadential closure
         - Strategic use of rests for breathing and phrasing
         """
-        random.seed(self._seed)
+        # The instance stream advances across compositions; replay uses a new seeded engine.
         
         # Convert bars to quarter notes (assuming 4/4 time)
         total_duration = bars * 4.0
@@ -354,7 +387,7 @@ class FugueEngine:
         current_time = 0.0
         
         # Start on tonic or dominant
-        start_degree = random.choice([0, 4])  # Tonic or dominant
+        start_degree = self.rng.choice([0, 4])  # Tonic or dominant
         current_degree = start_degree
         
         # Rhythmic patterns typical of Bach subjects (now including rests)
@@ -379,10 +412,10 @@ class FugueEngine:
         ]
         
         # Choose rhythm and rest patterns
-        durations = random.choice(rhythm_patterns)
+        durations = self.rng.choice(rhythm_patterns)
         # 30% chance of including rests in the subject
-        if random.random() < 0.3:
-            rest_pattern = random.choice(rest_patterns[1:])  # Exclude no-rest pattern
+        if self.rng.random() < 0.3:
+            rest_pattern = self.rng.choice(rest_patterns[1:])  # Exclude no-rest pattern
             # Ensure rest pattern matches duration pattern length
             while len(rest_pattern) != len(durations):
                 if len(rest_pattern) < len(durations):
@@ -403,12 +436,13 @@ class FugueEngine:
         intervals = []
         for i in range(len(durations) - 1):
             # Prefer steps and small leaps
-            if random.random() < 0.6:  # 60% steps
-                interval = random.choice([-1, 1])
-            elif random.random() < 0.3:  # 30% small leaps
-                interval = random.choice([-2, 2, -3, 3])
+            draw = self.rng.random()
+            if draw < 0.6:  # 60% steps
+                interval = self.rng.choice([-1, 1])
+            elif draw < 0.9:  # 30% small leaps
+                interval = self.rng.choice([-2, 2, -3, 3])
             else:  # 10% larger leaps
-                interval = random.choice([-4, 4, -5, 5])
+                interval = self.rng.choice([-4, 4, -5, 5])
             
             # Avoid too many consecutive leaps in same direction
             if len(intervals) >= 2 and all(x > 0 for x in intervals[-2:]) and interval > 0:
@@ -751,7 +785,7 @@ class FugueEngine:
             current_time += sum(note['dur'] for note in transformed_fragment)
             
             # Add strategic rests between fragments for phrasing (25% chance)
-            if i < len(sequence_pattern) - 1 and current_time < length_beats - 0.5 and random.random() < 0.25:
+            if i < len(sequence_pattern) - 1 and current_time < length_beats - 0.5 and self.rng.random() < 0.25:
                 # Add a quarter note rest for breathing
                 rest_duration = 0.25
                 episode.append(Note(pitch=None, dur=rest_duration, vel=0))
@@ -771,7 +805,7 @@ class FugueEngine:
                     
                     if last_note_pitch is not None:
                         connecting_note = Note(
-                            pitch=last_note_pitch + random.choice([-2, -1, 1, 2]),
+                            pitch=last_note_pitch + self.rng.choice([-2, -1, 1, 2]),
                             dur=0.25,
                             vel=70
                         )
@@ -824,7 +858,7 @@ class FugueEngine:
             if current_time >= subject_duration:
                 break
             
-            if is_rest or random.random() < 0.15:  # 15% chance of additional rests
+            if is_rest or self.rng.random() < 0.15:  # 15% chance of additional rests
                 # Add a rest
                 countersubject.append(Note(pitch=None, dur=duration, vel=0))
                 log.debug(f"Adding countersubject rest: dur={duration}")
@@ -835,13 +869,13 @@ class FugueEngine:
                     countersubject.append(Note(pitch=pitch, dur=duration, vel=80))
                     
                     # Move by step or small leap, preferring contrary motion to subject
-                    degree += random.choice([-2, -1, 1, 2])
+                    degree += self.rng.choice([-2, -1, 1, 2])
                     degree = max(-5, min(10, degree))  # Keep in reasonable range
                     
                 except Exception:
                     # Fallback to simple harmonic interval
                     base_pitch = subject_notes[0]['pitch'] if subject_notes else 60
-                    pitch = base_pitch + random.choice([3, 4, 7, 10])  # 3rd, 4th, 5th, 7th
+                    pitch = base_pitch + self.rng.choice([3, 4, 7, 10])  # 3rd, 4th, 5th, 7th
                     countersubject.append(Note(pitch=pitch, dur=duration, vel=80))
             
             current_time += duration
@@ -874,12 +908,12 @@ class FugueEngine:
             
             # Apply transformations for variety
             if i >= 2:
-                if params.allow_inversion and random.random() < 0.4:
+                if params.allow_inversion and self.rng.random() < 0.4:
                     axis_pitch = self._first_pitch(subject) or params.key_root
                     material = self.invert(material, axis_pitch)
-                elif random.random() < 0.3:
+                elif self.rng.random() < 0.3:
                     # Transpose to different octave
-                    material = self.transpose(material, random.choice([-12, 12]))
+                    material = self.transpose(material, self.rng.choice([-12, 12]))
             
             entries.append(Entry(
                 voice_index=voice_idx,
@@ -917,7 +951,7 @@ class FugueEngine:
                 break
             
             # 20% chance to add a rest between fragments for spacing
-            if i > 0 and random.random() < 0.2:
+            if i > 0 and self.rng.random() < 0.2:
                 rest_duration = 0.5
                 voice1.append(Note(pitch=None, dur=rest_duration, vel=0))
                 current_time += rest_duration
@@ -948,7 +982,7 @@ class FugueEngine:
                         break
                     
                     # Add occasional rests for breathing
-                    if i > 0 and random.random() < 0.15:
+                    if i > 0 and self.rng.random() < 0.15:
                         voice2.append(Note(pitch=None, dur=0.25, vel=0))
                     
                     fragment = fragment2 if i % 2 == 0 else fragment1
@@ -969,7 +1003,7 @@ class FugueEngine:
                     break
                 
                 # More frequent rests due to slower material
-                if i > 0 and random.random() < 0.3:
+                if i > 0 and self.rng.random() < 0.3:
                     voice3.append(Note(pitch=None, dur=1.0, vel=0))
                     log.debug(f"Added rest in augmented voice: dur=1.0")
                 
@@ -994,7 +1028,7 @@ class FugueEngine:
             cadence = []
             
             # 20% chance to start with a dramatic rest
-            if random.random() < 0.2:
+            if self.rng.random() < 0.2:
                 cadence.append(Note(pitch=None, dur=0.5, vel=0))
                 log.debug("Adding dramatic rest before cadence")
             
@@ -1002,7 +1036,7 @@ class FugueEngine:
             cadence.append(Note(pitch=self.scale_mapper.get_note(4, octave=0), dur=1.0, vel=90))
             
             # Optional brief rest before resolution (30% chance)
-            if random.random() < 0.3:
+            if self.rng.random() < 0.3:
                 cadence.append(Note(pitch=None, dur=0.25, vel=0))
                 log.debug("Adding breath before cadential resolution")
             
@@ -1015,7 +1049,7 @@ class FugueEngine:
             cadence = []
             
             # Optional dramatic rest
-            if random.random() < 0.2:
+            if self.rng.random() < 0.2:
                 cadence.append(Note(pitch=None, dur=0.5, vel=0))
             
             cadence.extend([
@@ -1077,7 +1111,7 @@ class FugueEngine:
                 connecting_phrase = self.slice_by_time(subject, 0.0, min(2.0, subject_length / 2))
                 if connecting_phrase:
                     # Transpose the connecting phrase to bridge the keys
-                    transpose_amount = random.choice([2, -2, 5, -5])
+                    transpose_amount = self.rng.choice([2, -2, 5, -5])
                     connecting_phrase = self.transpose(connecting_phrase, transpose_amount)
                     voice.extend(connecting_phrase)
                     current_time += sum(note['dur'] for note in connecting_phrase)
@@ -1231,9 +1265,11 @@ class FugueEngine:
 class FugueSequencer:
     """Play prepared score events against parent transport without rendering on ticks."""
 
-    def __init__(self, state: State, scale_mapper: ScaleMapper):
+    def __init__(self, state: State, scale_mapper: ScaleMapper, seed: Optional[int] = None):
         self.state = state
         self.scale_mapper = scale_mapper
+        self._seed_rng = random.Random(seed)
+        self._composition_seed = self._seed_rng.getrandbits(64)
         self._epoch = 0
         self._active_fugue = None
         self._fugue_start_time = 0.0
@@ -1252,7 +1288,7 @@ class FugueSequencer:
         return PreparationRequest(
             self._epoch, max(1, min(4, self.state.get('voices', 3))),
             self.scale_mapper.root_note, self.state.get('scale_mode', 'minor'),
-            self.state.get('density', 0.5), tuple(self.scale_mapper.current_scale_intervals))
+            self.state.get('density', 0.5), tuple(self.scale_mapper.current_scale_intervals), self._composition_seed)
 
     def invalidate_preparation(self) -> None:
         """Reject stale work immediately; leaving fugue mode also abandons playback."""
@@ -1277,6 +1313,7 @@ class FugueSequencer:
             self.preparation.waiting = True
             return False
         self.preparation.consumed = ready
+        self._composition_seed = self._seed_rng.getrandbits(64)
         self.preparation.waiting = False
         self._active_fugue = ready[1]
         self._origin = beat

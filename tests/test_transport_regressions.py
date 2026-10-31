@@ -290,3 +290,18 @@ def test_song_initial_tempo_factor_sets_gate(state, monkeypatch):
     seq._generate_step_note(0)
     assert seq.clock.bpm == 60
     assert notes[0].duration == pytest.approx(.8)
+
+
+@pytest.fixture(autouse=True)
+def prepared_song_fixture(monkeypatch):
+    """Prepare controlled songs outside callbacks; worker lateness is tested separately."""
+    from song_composition import prepare_song
+    original = SongSequencer.start_new_song
+    def start(song):
+        request = song._snapshot()
+        if request is None:
+            song.state.set('direction_pattern', 'song')
+            request = song._snapshot()
+        song.preparation.ready = (request, prepare_song(request))
+        return original(song)
+    monkeypatch.setattr(SongSequencer, 'start_new_song', start)

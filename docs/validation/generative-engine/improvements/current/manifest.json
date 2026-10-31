@@ -1,0 +1,231 @@
+{
+  "revision": "working-tree",
+  "seed": 1729,
+  "bpm": 120,
+  "scale": "major",
+  "root": 60,
+  "division": "eighth",
+  "files": [
+    {
+      "name": "verse_chorus",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "7": 51,
+          "3": 25,
+          "4": 58,
+          "0": 243,
+          "1": 3,
+          "5": 76,
+          "2": 68,
+          "9": 1
+        },
+        "notes": 528,
+        "end_beat": 319.6,
+        "mean_velocity": 81.75568181818181,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 0
+      },
+      "midi_sha256": "5d63ace442424f77c3b4b113ed30f5d8fa5ea7175575bca1a6ae04d93d642c6c"
+    },
+    {
+      "name": "aaba",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "7": 27,
+          "3": 19,
+          "4": 17,
+          "0": 108,
+          "1": 5,
+          "5": 31,
+          "2": 33,
+          "9": 1,
+          "11": 1
+        },
+        "notes": 245,
+        "end_beat": 159.2,
+        "mean_velocity": 79.80408163265307,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 0
+      },
+      "midi_sha256": "abfdb047be2ce074b56a4132e809331239c57884af8cbda0f23758f4d5d88f0c"
+    },
+    {
+      "name": "verse_chorus_bridge",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "7": 60,
+          "3": 32,
+          "4": 76,
+          "0": 355,
+          "1": 4,
+          "5": 97,
+          "2": 93,
+          "9": 4,
+          "11": 1
+        },
+        "notes": 725,
+        "end_beat": 431.2,
+        "mean_velocity": 83.82620689655172,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 0
+      },
+      "midi_sha256": "596f90e5655312c3170cda894ca5331e3a78850e2b2e9bb67936db0092b1b1c6"
+    },
+    {
+      "name": "blues_twelve_bar",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "7": 48,
+          "3": 25,
+          "4": 34,
+          "0": 129,
+          "1": 24,
+          "5": 45,
+          "2": 27,
+          "10": 6,
+          "8": 1,
+          "6": 5
+        },
+        "notes": 347,
+        "end_beat": 223.2,
+        "mean_velocity": 81.51008645533142,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 65
+      },
+      "midi_sha256": "bd393ec6aaf8f7f5c0ffdbd331fd575e57528b228d84daa5169c59a2b67e2c09"
+    },
+    {
+      "name": "pop_standard",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "7": 70,
+          "3": 35,
+          "4": 91,
+          "0": 394,
+          "1": 4,
+          "5": 114,
+          "2": 100,
+          "9": 6,
+          "11": 1
+        },
+        "notes": 818,
+        "end_beat": 479.2,
+        "mean_velocity": 84.47310513447432,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 0
+      },
+      "midi_sha256": "20a24c4e4c0edf7c1d4cb832ad595f4e652d1011dc28bed678b504475b1a2e4a"
+    },
+    {
+      "name": "minimalist",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "0": 417,
+          "4": 66,
+          "7": 31,
+          "3": 11
+        },
+        "notes": 528,
+        "end_beat": 447.2,
+        "mean_velocity": 76.625,
+        "crossing_observations": 0,
+        "strong_beat_dissonance_observations": 0
+      },
+      "midi_sha256": "a5ef549566f29ac8d04ec677cf11638b7a2cac66fa5dc5385b9283c401a93d35"
+    },
+    {
+      "name": "fugue-3",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "11": 13,
+          "2": 56,
+          "9": 13,
+          "3": 22,
+          "14": 8,
+          "12": 10,
+          "1": 30,
+          "15": 3,
+          "6": 3,
+          "0": 12,
+          "4": 9,
+          "5": 15,
+          "8": 3,
+          "10": 4,
+          "7": 2
+        },
+        "notes": 206,
+        "end_beat": 96.0,
+        "mean_velocity": 90.95145631067962,
+        "crossing_observations": 21,
+        "strong_beat_dissonance_observations": 17
+      },
+      "midi_sha256": "1e2721f646f63607a3cea32058ff111788d299effceb7986141e1a53d51fe2ac"
+    },
+    {
+      "name": "fugue-4",
+      "metrics": {
+        "melodic_interval_semitones": {
+          "11": 12,
+          "2": 54,
+          "9": 15,
+          "3": 21,
+          "14": 9,
+          "12": 12,
+          "1": 27,
+          "15": 8,
+          "10": 7,
+          "6": 3,
+          "0": 14,
+          "4": 6,
+          "5": 15,
+          "8": 3,
+          "7": 3
+        },
+        "notes": 213,
+        "end_beat": 100.0,
+        "mean_velocity": 90.89201877934272,
+        "crossing_observations": 16,
+        "strong_beat_dissonance_observations": 15
+      },
+      "midi_sha256": "5387bab8cd05e5b009eee687fb0ae1117a95591640d796b20038dd7e1921eeac"
+    }
+  ],
+  "evidence": "Offline events and MIDI; listening and physical MIDI not validated",
+  "source_sha256": {
+    "action_handler.py": "0e5398bc0789370001c7908017e1e3e44d990e1f96b11b2498a1c8cbd9ea4844",
+    "api_server.py": "7c5c98d2b131c7b0de37b72fda49689e0119915911b7ff9508876514db66319d",
+    "cc_profiles.py": "3a17f15193148dff5c0ed2e1af422061df202aa2b60a49cace43dd1dd84da0d5",
+    "config.py": "0f8ca46b57f780d2f0e2bffe884619841636b093a0e84867166b65670b2f8b75",
+    "events.py": "1b7299466129ba262f1ec234d2aa2889eb167cf2c34acf68b6ba1e5812c26979",
+    "external_hardware.py": "7f2ccabaa578db8f410f6d0a7bc6e8cd3c635eb341f09e71cdbe2c79324f10a0",
+    "fugue.py": "59dbf053bac5e3343f980a9d776bc20879f364714143713b6deaccb26004def7",
+    "fugue_preparation.py": "a66e02ab7adc25147abecb4f129767c85c351e6e0b872000493062604074a88f",
+    "hid_input.py": "364498be2d355fe052e057c460a0c77950539ddd7382d3f499f910e03db542fa",
+    "hidapi_input.py": "ede0c30eff7467f46657804ec79b46afdf15820cf96cac111af455e91611a234",
+    "hybrid_input.py": "049c0b360bd1f2988c417180d301dfab6860a30c90fbb3d2f7437ecbd2e6bd55",
+    "idle.py": "5d687fa8ccdf2b68945949d6682e3a68bf91ce06f6008af0295bd4070646aedb",
+    "latency_optimizer.py": "80b9966d6c6efcfda305af6ef6c52c16043d0a08ae117ff1d7011c5436bcb9f1",
+    "logging_utils.py": "053c22c94e2efb36462650f2f45d5c17d337a6410bd719dee7249d5659acdd3a",
+    "main.py": "00c2b248de79e4322c2c489f8cd00f78b8fd85718bf9bb2e57bbe00fac06ba52",
+    "midi_clock.py": "02ca90d0951591d4cf7e0ce02b49c127cb0f660ce78f4ab354ae498a189b71fc",
+    "midi_in.py": "31f90c8c1f8882abb5068e4f2d5512797466fcab0c7bf2db0df53573096f791b",
+    "midi_out.py": "8f3457d2f127944ee77b3f6bc5b186693a4ac7b5e8c7c1c2407bb6515ef4e9ae",
+    "musical_time.py": "afcc9564e2108ff3c3e58e5803cc8bd59cd6eb23945cd29cea624b9808ff072c",
+    "mutation.py": "d331d5d427bcf6be2e754793802e74bcb6d2384e0f21c32512bdd90439ec5beb",
+    "note_scheduler.py": "97de7ec8b0199ff1aa9ba057c6a8c23791f1d0d95d1877c6c14254a50ee75574",
+    "note_utils.py": "67218d5cf8a27255e1ccd9cd8061111c1fcb8add0648aa17613f99cbfb79dca2",
+    "nts1_integration.py": "bb2802a21ccdc1ec8e8eadca166720c07964f382ed4e18685ef3cf732a6f0397",
+    "nts1_mutation_plugin.py": "9f02d6de07d62669c7c3bf8d5df91486e47372efd4417fb3bb0f4055dbacf0ef",
+    "rhythm.py": "6e2eac875e9a107bc9bb27f4e624debc2b1527e4f0987b144fc461a05e586fc6",
+    "router.py": "a253b7e6ea71ad8f1946e270073a41bc60441cf0c0f8bc1efe6ddd32fd6535e2",
+    "scale_mapper.py": "2aa0c238cdff1e98dd77f47b0127b4dece2399c722af0b745c8b9415371f582b",
+    "sequencer.py": "6c86c0a8f92aef780eb9f7ebdd10e149b570027d8e605acf67cb7d1222c5b084",
+    "song.py": "beda008675ad74b044780b0c43b9c22361e1c08b69bd311140c16948cad94281",
+    "song_composition.py": "88795201123d2abdd9b5d30adfff55f95ee7106e1effe08b20c9e882015af189",
+    "state.py": "d27df7c1f6179762c838b1d3696f8da10f7884b14c62aa182a9be89bbc31fd12",
+    "ui_catalog.py": "b338f03844da37a5f8796bbc5c5de14363d3b95fd2ccd0f19760e3ed40494905",
+    "ui_persistence.py": "4ff0143d9b00a9878f725719456dbc931d30505852b057c76f41b0ebcc588c8d",
+    "ui_sessions.py": "55f0e8fb5583459c5167f4d3c278f3af289ec08186ca9752a2324d4a6e943cc3",
+    "ui_snapshot.py": "938216dff42b1b4886c0da50518ba55966b57be05058ce6f713093aa01f503e0"
+  }
+}

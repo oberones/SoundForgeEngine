@@ -63,21 +63,18 @@ class TestSongSequencer:
         assert self.song_sequencer._current_pattern is not None
         assert self.song_sequencer._current_section_index == 0
         assert not self.song_sequencer._between_songs
-        assert len(self.song_sequencer._voice_patterns) > 0
+        assert self.song_sequencer._material is not None
     
     def test_voice_initialization(self):
         """Test voice pattern initialization."""
         self.state.set('voices', 3, source='test')
         self.song_sequencer.start_new_song()
         
-        assert len(self.song_sequencer._voice_patterns) == 3
-        assert len(self.song_sequencer._voice_octave_shifts) == 3
-        assert len(self.song_sequencer._last_voice_notes) == 3
-        
-        # Check that patterns are different for harmonic variety
-        patterns = list(self.song_sequencer._voice_patterns.values())
-        assert len(set(tuple(p) for p in patterns)) > 1  # At least some variety
-    
+        assert self.song_sequencer._material_request.voices == 3
+        voices = {note.voice for section in self.song_sequencer._material.sections
+                  for group in section for note in group}
+        assert voices == {0, 1, 2}
+
     def test_section_settings_application(self):
         """Test that section settings are properly applied."""
         self.song_sequencer.start_new_song()
@@ -120,24 +117,16 @@ class TestSongSequencer:
         self.state.set('voices', 2, source='test')
         self.song_sequencer.start_new_song()
         
-        # Generate many notes to test voice leading
-        all_notes = []
-        for step in range(32):
-            notes = self.song_sequencer.get_next_step_notes(step)
-            all_notes.extend(notes)
-        
-        if len(all_notes) > 10:  # If we generated enough notes
-            # Check that we don't have too many large leaps
-            large_leaps = 0
-            for i in range(1, len(all_notes)):
-                interval = abs(all_notes[i][0] - all_notes[i-1][0])
-                if interval > 12:  # Larger than an octave
-                    large_leaps += 1
-            
-            # Should have mostly stepwise motion with some leaps
-            leap_ratio = large_leaps / len(all_notes)
-            assert leap_ratio < 0.3  # Less than 30% large leaps
-    
+        # Assess successive events within each voice, not interleaved bass/melody.
+        material = self.song_sequencer._material
+        for section in material.sections:
+            last = {}
+            for group in section:
+                for note in group:
+                    if note.voice in last:
+                        assert abs(note.pitch - last[note.voice]) <= 12
+                    last[note.voice] = note.pitch
+
     def test_between_songs_period(self):
         """Test the between-songs pause functionality."""
         # Start and immediately complete a song
@@ -392,3 +381,18 @@ class TestSongPatterns:
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
+
+@pytest.fixture(autouse=True)
+def prepared_song_fixture(monkeypatch):
+    """Prepare controlled songs outside callbacks; worker lateness is tested separately."""
+    from song_composition import prepare_song
+    original = SongSequencer.start_new_song
+    def start(song):
+        request = song._snapshot()
+        if request is None:
+            song.state.set('direction_pattern', 'song')
+            request = song._snapshot()
+        song.preparation.ready = (request, prepare_song(request))
+        return original(song)
+    monkeypatch.setattr(SongSequencer, 'start_new_song', start)

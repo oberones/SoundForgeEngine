@@ -194,3 +194,17 @@ The system supports multiple CC profiles allowing the same physical controls to 
 ---
 
 *Generated from codebase analysis on August 31, 2025*
+
+### Generative playback behavior
+
+Occurrence controls (`density`, `note_probability`, per-step probabilities) govern
+whether standard-mode attacks occur. Velocity and gate variation are independent;
+metrical accents follow elapsed beats. Existing velocity/gate controls retain their
+names. Song mode uses its preset's section density and rhythm mask, with prepared
+harmony, recurring motifs and phrase expression. Sections without masks reset to
+`all_on`. Minimalist retains static harmony; 12-Bar Blues follows I/IV/V changes.
+
+Generated same-pitch attacks on the same output channel explicitly release the old
+attack before retriggering. Only the replacement owns the note-off deadline.
+Channel 0 retains broadcast semantics across all 16 channels. MIDI dispatch is
+queued; no new action, API route, CLI command or persisted setting is introduced.

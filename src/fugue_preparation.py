@@ -5,7 +5,7 @@ import logging
 import multiprocessing
 import threading
 import time
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ class PreparationRequest:
     mode: str
     density: float
     intervals: tuple[int, ...]
+    seed: int = 0
 
 
 @dataclass(frozen=True)
@@ -34,7 +35,7 @@ def prepare_score(request: PreparationRequest) -> PreparedScore:
     from scale_mapper import ScaleMapper
     mapper = ScaleMapper({'major': list(request.intervals)})
     mapper.root_note = request.root
-    engine = FugueEngine(mapper)
+    engine = FugueEngine(mapper, seed=request.seed)
     params = FugueParams(n_voices=request.voices, key_root=request.root,
                          mode=request.mode, entry_gap_beats=2.0,
                          stretto_overlap=request.density * 0.5,
@@ -67,9 +68,11 @@ class ScorePreparation:
     slot that could already contain a newer result.
     """
 
-    def __init__(self, snapshot: Callable[[], Optional[PreparationRequest]],
-                 executor_factory=None):
+    def __init__(self, snapshot: Callable[[], Optional[Any]],
+                 executor_factory=None, prepare=prepare_score, name="fugue"):
         self.snapshot = snapshot
+        self.prepare = prepare
+        self.name = name
         self.ready = None
         self.consumed = None
         self.waiting = False
@@ -84,7 +87,7 @@ class ScorePreparation:
         if self._thread is not None:
             return
         self._stop.clear()
-        self._thread = threading.Thread(target=self._run, name='fugue-preparation', daemon=True)
+        self._thread = threading.Thread(target=self._run, name=f'{self.name}-preparation', daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
@@ -107,7 +110,7 @@ class ScorePreparation:
             while not self._stop.is_set():
                 request = self.snapshot()
                 if self.waiting and not was_waiting:
-                    log.info('fugue_preparation_waiting boundary_deferred=true')
+                    log.info('%s_preparation_waiting boundary_deferred=true', self.name)
                 was_waiting = self.waiting
                 if self.ready is not None and (self.ready[0] != request or self.ready is self.consumed):
                     self.ready = None
@@ -116,9 +119,9 @@ class ScorePreparation:
                         result = future.result()
                         if submitted == request:
                             self.ready = (submitted, result)
-                            log.info('fugue_prepared voices=%s', submitted.voices)
+                            log.info('composition_prepared request=%s', submitted)
                     except Exception:
-                        log.exception('fugue_preparation_failed retry_seconds=5')
+                        log.exception('%s_preparation_failed retry_seconds=5', self.name)
                         retry_at = time.monotonic() + 5.0
                         if executor is not None:
                             executor.shutdown(wait=True, cancel_futures=True)
@@ -129,9 +132,9 @@ class ScorePreparation:
                         if executor is None:
                             executor = self._executor_factory()
                         submitted = request
-                        future = executor.submit(prepare_score, request)
+                        future = executor.submit(self.prepare, request)
                     except Exception:
-                        log.exception('fugue_preparation_submit_failed retry_seconds=5')
+                        log.exception('%s_preparation_submit_failed retry_seconds=5', self.name)
                         retry_at = time.monotonic() + 5.0
                         if executor is not None:
                             executor.shutdown(wait=True, cancel_futures=True)
